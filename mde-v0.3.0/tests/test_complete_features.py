@@ -128,8 +128,7 @@ def test_admin_user_creation_expiry_and_connection_limit(client):
     scope_b["client"] = ("10.0.0.2", 1234)
     main.touch_playback_session("device-user", account, Request(scope_a))
     with pytest.raises(HTTPException) as error:
-        updated_account = main.authenticate("device-user", "a-strong-test-password")
-    main.touch_playback_session("device-user", updated_account, Request(scope_b))
+        main.touch_playback_session("device-user", account, Request(scope_b))
     assert error.value.status_code == 429
 
     updated = client.patch(
@@ -138,7 +137,8 @@ def test_admin_user_creation_expiry_and_connection_limit(client):
         json={"max_connections": 2},
     )
     assert updated.status_code == 200
-    main.touch_playback_session("device-user", account, Request(scope_b))
+    updated_account = main.authenticate("device-user", "a-strong-test-password")
+    main.touch_playback_session("device-user", updated_account, Request(scope_b))
 
 
 def test_epg_xmltv_and_short_epg(client):
