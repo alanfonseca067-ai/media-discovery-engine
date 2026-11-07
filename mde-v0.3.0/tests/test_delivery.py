@@ -26,6 +26,15 @@ def test_source_path_rejects_network_path_reference():
 def test_hls_rewrite_uses_persisted_opaque_resource_tokens(tmp_path, monkeypatch):
     monkeypatch.setattr(database, "DATABASE_PATH", tmp_path / "mde-test.sqlite3")
     database.init_db()
+    with database.connection() as db:
+        source = db.execute(
+            "INSERT INTO sources(name,base_url,delivery_mode,enabled) VALUES (?,?,?,1)",
+            ("test", "https://upstream.example", "proxy"),
+        )
+        db.execute(
+            "INSERT INTO media_items(id,title,media_type,source_id,source_path,enabled) VALUES (42,?,?,?,?,1)",
+            ("test media", "live", source.lastrowid, "master.m3u8"),
+        )
     monkeypatch.setattr(delivery, "validate_public_url", lambda value: value)
 
     rewritten = delivery.rewrite_hls_playlist(
