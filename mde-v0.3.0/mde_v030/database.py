@@ -93,7 +93,7 @@ CREATE INDEX IF NOT EXISTS idx_collection_jobs_status ON collection_jobs(status,
 _MIGRATIONS = {
     "users": {
         "max_connections": "INTEGER NOT NULL DEFAULT 1",
-        "created_at": "TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP",
+        "created_at": "TEXT NOT NULL DEFAULT ''",
     },
     "sources": {
         "manifest_path": "TEXT NOT NULL DEFAULT ''",
