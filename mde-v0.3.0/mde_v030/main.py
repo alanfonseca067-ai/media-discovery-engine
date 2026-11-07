@@ -69,6 +69,7 @@ def touch_playback_session(username: str, user, request: Request) -> int:
     now = int(time.time())
     client_key = _client_key(request)
     with connection() as db:
+        db.execute("BEGIN IMMEDIATE")
         db.execute(
             "DELETE FROM playback_sessions WHERE last_seen < ?",
             (now - PLAYBACK_SESSION_TTL_SECONDS,),
@@ -824,25 +825,46 @@ def player_api(
             rows = db.execute(sql, params).fetchall()
         entries = []
         for index, row in enumerate(rows):
-            extension = "ts" if kind == "live" else "mp4"
-            entries.append({
-                "num": index + 1,
-                "name": row["title"],
-                "title": row["title"],
-                "stream_type": kind,
-                "stream_id": row["id"],
-                "category_id": str(row["category_id"] or 0),
-                "category_ids": [row["category_id"]] if row["category_id"] else [],
-                "container_extension": extension,
-                "stream_icon": row["cover_url"],
-                "epg_channel_id": row["epg_channel_id"] or row["tvg_id"] or "",
-                "added": "0",
-                "is_adult": 0,
-                "custom_sid": "",
-                "direct_source": "",
-                "tv_archive": 0,
-                "tv_archive_duration": 0,
-            })
+            if kind == "series":
+                entries.append({
+                    "num": index + 1,
+                    "name": row["title"],
+                    "series_id": row["id"],
+                    "cover": row["cover_url"],
+                    "plot": "",
+                    "cast": "",
+                    "director": "",
+                    "genre": "",
+                    "releaseDate": "",
+                    "last_modified": "0",
+                    "rating": "",
+                    "rating_5based": 0,
+                    "backdrop_path": [row["cover_url"]] if row["cover_url"] else [],
+                    "youtube_trailer": "",
+                    "episode_run_time": "",
+                    "category_id": str(row["category_id"] or 0),
+                    "category_ids": [row["category_id"]] if row["category_id"] else [],
+                })
+            else:
+                extension = "ts" if kind == "live" else "mp4"
+                entries.append({
+                    "num": index + 1,
+                    "name": row["title"],
+                    "title": row["title"],
+                    "stream_type": kind,
+                    "stream_id": row["id"],
+                    "category_id": str(row["category_id"] or 0),
+                    "category_ids": [row["category_id"]] if row["category_id"] else [],
+                    "container_extension": extension,
+                    "stream_icon": row["cover_url"],
+                    "epg_channel_id": row["epg_channel_id"] or row["tvg_id"] or "",
+                    "added": "0",
+                    "is_adult": 0,
+                    "custom_sid": "",
+                    "direct_source": "",
+                    "tv_archive": 0,
+                    "tv_archive_duration": 0,
+                })
         return entries
 
     if action == "get_vod_info":
