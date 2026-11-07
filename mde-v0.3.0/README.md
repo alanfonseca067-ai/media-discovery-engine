@@ -181,18 +181,18 @@ A importação XMLTV não aceita DOCTYPE nem declarações de entidades e só gr
 | `GET /player_api.php` | Login e ações Xtream |
 | `GET /get.php` | Playlist M3U |
 | `GET /xmltv.php` | Guia XMLTV |
-| `GET /play/live/...` | Reprodução de canal |
-| `GET /play/movie/...` | Reprodução de filme |
-| `GET /series/...` | Reprodução de episódio |
+| `GET /live/{username}/{password}/{id}.ts` | Reprodução Xtream de canal |\n| `GET /play/live/...` | Alias de reprodução de canal |
+| `GET /movie/{username}/{password}/{id}.mp4` | Reprodução Xtream de filme |\n| `GET /play/movie/...` | Alias de reprodução de filme |
+| `GET /series/{username}/{password}/{episode_id}.mp4` | Reprodução Xtream de episódio |
 | `GET /play-resource/...` | Segmentos e recursos HLS pelo proxy |
 | `GET /admin` | Painel administrativo |
 | `POST /v1/admin/sources` | Cadastro de fontes |\n| `PATCH /v1/admin/sources/{id}` | Alterar fontes |\n| `DELETE /v1/admin/sources/{id}` | Remover fonte sem mídias vinculadas |
 | `POST /v1/admin/sources/{id}/collect` | Enfileirar coleta |
-| `POST /v1/admin/categories` | Cadastro de categorias |
+| `POST /v1/admin/categories` | Cadastro de categorias |\n| `PATCH /v1/admin/categories/{id}` | Renomear categoria |\n| `DELETE /v1/admin/categories/{id}` | Remover categoria sem mídias vinculadas |
 | `POST /v1/admin/media` | Cadastro de mídia |\n| `PATCH /v1/admin/media/{id}` | Alterar mídia |\n| `DELETE /v1/admin/media/{id}` | Remover mídia (séries também removem episódios vinculados) |
 | `POST /v1/admin/users` | Cadastro de usuários |\n| `PATCH /v1/admin/users/{username}` | Alterar usuário |\n| `DELETE /v1/admin/users/{username}` | Remover usuário |
 | `POST /v1/admin/epg/import` | Importar XMLTV |
-| `GET /v1/admin/jobs` | Listagem de coletas |\n| `GET /v1/stats` | Estatísticas administrativas |
+| `GET /v1/admin/jobs` | Listagem de coletas |\n| `POST /v1/admin/jobs/{id}/retry` | Reenfileirar coleta concluída ou com falha |\n| `GET /v1/stats` | Estatísticas administrativas |
 
 ## Configurações
 
@@ -215,7 +215,7 @@ A importação XMLTV não aceita DOCTYPE nem declarações de entidades e só gr
 python -m pytest -v
 ```
 
-O GitHub Actions executa a suíte no Python 3.12 em cada alteração do branch `mde-0.3.0`.
+O GitHub Actions executa a suíte no Python 3.12 e 3.14 em cada alteração do branch `mde-0.3.0`.
 
 ## Limites conhecidos e segurança
 
