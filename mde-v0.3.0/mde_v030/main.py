@@ -4,7 +4,7 @@ import html
 import time
 from datetime import datetime, timezone
 from urllib.parse import quote
-from xml.etree.ElementTree import Element, SubElement, tostring
+from xml.etree.ElementTree import Element, SubElement, fromstring, tostring
 
 from fastapi import FastAPI, Header, HTTPException, Query, Request
 from fastapi.responses import HTMLResponse, PlainTextResponse, Response
@@ -173,6 +173,9 @@ class EpgProgrammeIn(BaseModel):
         if end <= start:
             raise ValueError("end_at precisa ser posterior a start_at")
         return self
+
+class EpgImportIn(BaseModel):
+    xml_content: str = Field(min_length=1, max_length=5_000_000)
 
 
 @app.get("/health")
@@ -469,6 +472,69 @@ def create_epg_programme(
             ),
         )
     return {"saved": True, "channel_id": payload.channel_id}
+
+
+@app.post("/v1/admin/epg/import")
+def import_epg_xmltv(
+    payload: EpgImportIn,
+    x_mde_admin_key: str | None = Header(default=None),
+):
+    require_admin(x_mde_admin_key)
+    upper = payload.xml_content.upper()
+    if "<!DOCTYPE" in upper or "<!ENTITY" in upper:
+        raise HTTPException(status_code=422, detail="DOCTYPE e entidades XML não são permitidos")
+    try:
+        root = fromstring(payload.xml_content)
+    except Exception as exc:
+        raise HTTPException(status_code=422, detail="Arquivo XMLTV inválido") from exc
+    if root.tag != "tv":
+        raise HTTPException(status_code=422, detail="O XML enviado não é um documento XMLTV")
+    with connection() as db:
+        known = {
+            row["channel_id"]
+            for row in db.execute(
+                """SELECT DISTINCT COALESCE(NULLIF(epg_channel_id,''),tvg_id) AS channel_id
+                   FROM media_items WHERE media_type='live' AND enabled=1"""
+            ).fetchall()
+            if row["channel_id"]
+        }
+        imported = 0
+        ignored = 0
+        for node in root.findall("programme"):
+            channel_id = node.attrib.get("channel", "")
+            start_raw = node.attrib.get("start", "")
+            stop_raw = node.attrib.get("stop", "")
+            title_node = node.find("title")
+            if channel_id not in known or not start_raw or not stop_raw or title_node is None:
+                ignored += 1
+                continue
+            try:
+                start_dt = datetime.strptime(start_raw, "%Y%m%d%H%M%S %z").astimezone(timezone.utc)
+                stop_dt = datetime.strptime(stop_raw, "%Y%m%d%H%M%S %z").astimezone(timezone.utc)
+            except ValueError:
+                ignored += 1
+                continue
+            if stop_dt <= start_dt:
+                ignored += 1
+                continue
+            desc_node = node.find("desc")
+            category_node = node.find("category")
+            db.execute(
+                """INSERT INTO epg_programmes(channel_id,title,description,start_at,end_at,category)
+                   VALUES (?,?,?,?,?,?)
+                   ON CONFLICT(channel_id,start_at,end_at) DO UPDATE SET
+                   title=excluded.title,description=excluded.description,category=excluded.category""",
+                (
+                    channel_id,
+                    (title_node.text or "Sem título")[:512],
+                    (desc_node.text or "")[:10000] if desc_node is not None else "",
+                    start_dt.isoformat(),
+                    stop_dt.isoformat(),
+                    (category_node.text or "")[:120] if category_node is not None else "",
+                ),
+            )
+            imported += 1
+    return {"imported_programmes": imported, "ignored_programmes": ignored, "known_channels": len(known)}
 
 
 @app.get("/v1/admin/epg/programmes")
