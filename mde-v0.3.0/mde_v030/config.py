@@ -11,3 +11,9 @@ MAX_PLAYLIST_BYTES = max(65536, int(os.getenv("MDE_MAX_PLAYLIST_BYTES", "2097152
 PLAYBACK_SESSION_TTL_SECONDS = max(30, int(os.getenv("MDE_PLAYBACK_SESSION_TTL_SECONDS", "120")))
 COLLECTION_POLL_SECONDS = max(1, int(os.getenv("MDE_COLLECTION_POLL_SECONDS", "5")))
 MAX_COLLECTION_BYTES = max(65536, int(os.getenv("MDE_MAX_COLLECTION_BYTES", "10485760")))
+
+ALLOWED_PRIVATE_HOSTS = frozenset(
+    item.strip().lower().rstrip(".")
+    for item in os.getenv("MDE_ALLOWED_PRIVATE_HOSTS", "").split(",")
+    if item.strip()
+)
