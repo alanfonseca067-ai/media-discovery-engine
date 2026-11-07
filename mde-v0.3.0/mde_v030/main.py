@@ -847,7 +847,8 @@ def player_api(
     if action in stream_actions:
         kind = stream_actions[action]
         with connection() as db:
-            sql = """SELECT m.id,m.title,m.category_id,m.epg_channel_id,m.tvg_id,m.cover_url
+            sql = """SELECT m.id,m.title,m.category_id,m.epg_channel_id,m.tvg_id,m.cover_url,m.plot,
+                            m.release_date,m.rating
                      FROM media_items m JOIN sources s ON s.id=m.source_id
                      WHERE m.media_type=? AND m.enabled=1 AND s.enabled=1"""
             params: list[object] = [kind]
@@ -864,13 +865,13 @@ def player_api(
                     "name": row["title"],
                     "series_id": row["id"],
                     "cover": row["cover_url"],
-                    "plot": "",
+                    "plot": row["plot"],
                     "cast": "",
                     "director": "",
                     "genre": "",
-                    "releaseDate": "",
+                    "releaseDate": row["release_date"],
                     "last_modified": "0",
-                    "rating": "",
+                    "rating": row["rating"],
                     "rating_5based": 0,
                     "backdrop_path": [row["cover_url"]] if row["cover_url"] else [],
                     "youtube_trailer": "",
@@ -1082,15 +1083,15 @@ def get_playlist(
     for row in rows:
         kind = row["media_type"]
         extension = output if kind == "live" else ("mp4" if output in {"ts", "m3u8"} else output)
-        if type == "m3u":
-            lines.append(f"{base}/play/{kind}/{safe_user}/{safe_pass}/{row['id']}.{extension}")
-            continue
         group = clean_m3u(categories.get(row["category_id"], kind.title()))
         title = clean_m3u(row["title"])
         tvg_id = clean_m3u(row["epg_channel_id"] or row["tvg_id"])
-        lines.append(
-            f'#EXTINF:-1 tvg-id="{tvg_id}" tvg-name="{title}" group-title="{group}",{title}'
-        )
+        if type == "m3u":
+            lines.append(f"#EXTINF:-1,{title}")
+        else:
+            lines.append(
+                f'#EXTINF:-1 tvg-id="{tvg_id}" tvg-name="{title}" group-title="{group}",{title}'
+            )
         lines.append(f"{base}/play/{kind}/{safe_user}/{safe_pass}/{row['id']}.{extension}")
     return "\n".join(lines) + "\n"
 
