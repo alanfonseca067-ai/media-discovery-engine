@@ -117,8 +117,17 @@ class SourceIn(BaseModel):
     @model_validator(mode="after")
     def validate_source_paths(self):
         parsed = urlsplit(str(self.base_url))
+        decoded_base_path = unquote(parsed.path)
         if parsed.username is not None or parsed.password is not None:
             raise ValueError("Credenciais devem ser configuradas fora da URL base")
+        if (
+            parsed.query
+            or parsed.fragment
+            or "\\" in decoded_base_path
+            or "\x00" in decoded_base_path
+            or any(part == ".." for part in decoded_base_path.split("/"))
+        ):
+            raise ValueError("URL base não pode conter query, fragmento ou caminho fora da raiz cadastrada")
         manifest = urlsplit(self.manifest_path.strip())
         decoded = unquote(manifest.path)
         if (
