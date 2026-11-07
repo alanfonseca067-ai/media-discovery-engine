@@ -92,12 +92,12 @@ def rewrite_hls_playlist(text: str, base_url: str, media_id: int, request_base: 
     return "\n".join(output) + "\n"
 
 
-async def _open_upstream(url: str, headers: dict[str, str]):
+async def _open_upstream(url: str, headers: dict[str, str], method: str = 'GET'):
     client = httpx.AsyncClient(timeout=UPSTREAM_TIMEOUT_SECONDS, follow_redirects=False)
     current = validate_public_url(url)
     try:
         for _ in range(6):
-            request = client.build_request("GET", current, headers=headers)
+            request = client.build_request(method, current, headers=headers)
             response = await client.send(request, stream=True)
             if response.status_code in _REDIRECT_CODES:
                 location = response.headers.get("location")
@@ -119,13 +119,23 @@ async def deliver_redirect(upstream_url: str):
 
 
 async def deliver_proxy(upstream_url: str, media_id: int, request_base: str,
-                        username: str, password: str, incoming_headers: dict[str, str]):
+                        username: str, password: str, incoming_headers: dict[str, str], method: str = 'GET'):
     forward_headers = {}
     for name in ("range", "if-range", "user-agent", "accept", "accept-language"):
         if name in incoming_headers:
             forward_headers[name] = incoming_headers[name]
-    client, upstream, final_url = await _open_upstream(upstream_url, forward_headers)
+    client, upstream, final_url = await _open_upstream(upstream_url, forward_headers, method)
     content_type = upstream.headers.get("content-type", "application/octet-stream").split(";", 1)[0].lower()
+    if method == "HEAD":
+        head_headers = {}
+        for name in ("content-type", "content-length", "content-range", "accept-ranges", "last-modified", "etag"):
+            if name in upstream.headers:
+                head_headers[name] = upstream.headers[name]
+        status_code = upstream.status_code
+        await upstream.aclose()
+        await client.aclose()
+        return Response(status_code=status_code, headers=head_headers)
+
     is_playlist = ("mpegurl" in content_type or final_url.lower().split("?", 1)[0].endswith((".m3u8", ".m3u")))
     if is_playlist:
         try:
