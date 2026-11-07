@@ -1,15 +1,14 @@
-# MDE 0.3.0 — foundation
+# MDE 0.3.0 — catalog and Xtream API foundation
 
-This directory is the new 0.3.0 development line. The original 0.2.0 ZIP in the repository root is intentionally left untouched.
+The 0.2.0 ZIP in the repository root is preserved. This is a separate development line.
 
-## Current scope
-- Xtream-style account authentication surface: `player_api.php`
-- M3U playlist endpoint: `get.php`
-- SQLite catalog for users, categories, and media items
-- Source registry with delivery policy configured per source: `redirect` or `proxy`
-- Health endpoint and tests
-
-Only add media sources that you own or are explicitly authorized to distribute. MDE stores catalog references; it does not discover or grant rights to third-party streams.
+## Implemented in this stage
+- SQLite tables for users, categories, media, and sources.
+- Per-source delivery policy: `redirect` or `proxy`.
+- Xtream-style `player_api.php` authentication, category and catalog actions.
+- M3U generation at `get.php`, with stable MDE playback URLs.
+- Admin endpoints to register sources, categories, and media items.
+- Admin endpoints require the `X-MDE-Admin-Key` header and a configured secret.
 
 ## Run on Windows
 ```powershell
@@ -19,16 +18,27 @@ py -m venv .venv
 python -m pip install -e ".[dev]"
 $env:MDE_DATABASE_PATH = "mde-v030.sqlite3"
 $env:MDE_BOOTSTRAP_USER = "demo"
-$env:MDE_BOOTSTRAP_PASSWORD = "change-this-password"
+$env:MDE_BOOTSTRAP_PASSWORD = "replace-with-a-long-password"
+$env:MDE_ADMIN_KEY = "replace-with-a-long-random-admin-key"
 uvicorn mde_v030.main:app --reload
 ```
 
 Open `http://127.0.0.1:8000/health` and `http://127.0.0.1:8000/docs`.
 
-The bootstrap account is created only when the database has no users. The first-stage M3U response is a catalog preview, not a playable playlist yet. Change the example password before exposing the service to a network. Do not commit real credentials, private stream URLs, database files, or API keys.
+## Add a source
+In Swagger (`/docs`), call `POST /v1/admin/sources` and set header `X-MDE-Admin-Key`.
+Example JSON:
+```json
+{"name":"Minha fonte autorizada","base_url":"https://media.example.net","delivery_mode":"proxy","enabled":true}
+```
+Use `redirect` or `proxy` per source.
 
-## API examples
-- `GET /player_api.php?username=demo&password=...`
-- `GET /get.php?username=demo&password=...&type=m3u_plus&output=ts`
+Then create a category with `POST /v1/admin/categories`, and add an item with `POST /v1/admin/media`:
+```json
+{"title":"Canal de teste","media_type":"live","source_id":1,"source_path":"channel/master.m3u8","category_id":1}
+```
 
-Playback delivery is deliberately not enabled in this first foundation. Redirect/proxy selection is stored per media item and will be connected to the secure HLS delivery layer in the next stage.
+Only use streams you own or are explicitly authorized to distribute. Do not commit real credentials, private stream URLs, database files, or API keys.
+
+## Not complete yet
+The generated M3U contains stable MDE playback URLs, but the `/play` delivery handler is not enabled yet. Redirect/proxy transport, secure HLS playlist rewriting, segment delivery, range handling, concurrent-session enforcement, and real-client compatibility tests are the next stage. Do not expose this development server publicly yet.
