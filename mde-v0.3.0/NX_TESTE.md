@@ -1,77 +1,110 @@
-# Roteiro de integração MDE 0.3.0 com NX IPTV
+# Preparação do MDE 0.3.0 para integração com NX IPTV
 
-Este roteiro é para o primeiro teste controlado entre o NX IPTV e o MDE. Use somente uma fonte de mídia própria ou cuja reprodução esteja autorizada.
+Este roteiro instala o servidor, o painel e o worker e valida a API antes de cadastrar o MDE no NX. Use somente fontes e mídias próprias ou autorizadas.
 
-## 1. Iniciar o MDE no Windows
+## 1. Instalar no Windows
 
-Extraia o ZIP do branch `mde-0.3.0`. Abra PowerShell na pasta `mde-v0.3.0` e execute:
+Extraia o ZIP do branch `mde-0.3.0`. Abra PowerShell na pasta `mde-v0.3.0`:
 
 ```powershell
 py -3.12 -m venv .venv
 .venv\Scripts\Activate.ps1
+python -m pip install --upgrade pip
 python -m pip install -e ".[dev]"
 $env:MDE_DATABASE_PATH = "$PWD\mde-v030.sqlite3"
 $env:MDE_BOOTSTRAP_USER = "nx-teste"
-$env:MDE_BOOTSTRAP_PASSWORD = "troque-esta-senha"
-$env:MDE_ADMIN_KEY = "troque-esta-chave-admin"
-uvicorn mde_v030.main:app --host 0.0.0.0 --port 8000
+$env:MDE_BOOTSTRAP_PASSWORD = "troque-por-uma-senha-forte"
+$env:MDE_ADMIN_KEY = "troque-por-uma-chave-administrativa-longa"
+uvicorn mde_v030.main:app --host 127.0.0.1 --port 8000
 ```
 
-Confirme no navegador:
-- `http://127.0.0.1:8000/health`
-- `http://127.0.0.1:8000/docs`
+Abra:
+- Painel: `http://127.0.0.1:8000/admin`
+- Saúde: `http://127.0.0.1:8000/health`
+- API/Swagger: `http://127.0.0.1:8000/docs`
 
-Atenção: `0.0.0.0` permite acesso pela rede local. Não encaminhe a porta do roteador para a internet. Para uso somente no próprio PC, prefira `--host 127.0.0.1`.
+Deixe esse terminal aberto.
 
-## 2. Cadastrar fonte e catálogo
+## 2. Iniciar o worker de coleta
 
-No Swagger, envie o cabeçalho `X-MDE-Admin-Key` com a chave definida em `MDE_ADMIN_KEY`.
+Abra outro PowerShell na mesma pasta e configure o mesmo ambiente e banco:
 
-1. Execute `POST /v1/admin/sources`.
-2. Escolha `delivery_mode=proxy` para ocultar o endereço da origem e entregar HLS pelo MDE, ou `redirect` para o player acessar diretamente a origem.
-3. Execute `POST /v1/admin/categories`.
-4. Execute `POST /v1/admin/media`, informando o ID da fonte e o caminho relativo da mídia.
+```powershell
+.venv\Scripts\Activate.ps1
+$env:MDE_DATABASE_PATH = "$PWD\mde-v030.sqlite3"
+$env:MDE_BOOTSTRAP_USER = "nx-teste"
+$env:MDE_BOOTSTRAP_PASSWORD = "troque-por-uma-senha-forte"
+$env:MDE_ADMIN_KEY = "troque-por-uma-chave-administrativa-longa"
+python -m mde_v030.worker
+```
 
-A fonte deve ser acessível a partir da máquina que executa o MDE. O caminho da mídia deve ser relativo ao endereço base cadastrado.
+Deixe esse terminal aberto também. O worker processa os jobs enfileirados. Para processar somente uma vez e sair, use `python -m mde_v030.worker --once`.
 
-## 3. Verificar a API antes do NX
+## 3. Cadastrar e coletar um catálogo autorizado
 
-Substitua usuário, senha e endereço pelos valores locais configurados:
+No painel, informe a chave de `MDE_ADMIN_KEY`. Cadastre uma fonte com:
+- `base_url`: origem raiz autorizada.
+- `manifest_path`: caminho relativo da playlist M3U.
+- `catalog_media_type`: `live` para canais ou `movie` para filmes.
+- `delivery_mode`: `proxy` ou `redirect`.
 
-- Login: `GET /player_api.php?username=nx-teste&password=...`
-- Categorias ao vivo: `GET /player_api.php?username=...&password=...&action=get_live_categories`
+Clique em enfileirar coleta, ou no Swagger execute `POST /v1/admin/sources/{source_id}/collect`. Consulte o resultado em `GET /v1/admin/jobs/{job_id}` ou no painel.
+
+O worker só importa entradas do mesmo protocolo, host e porta e dentro do caminho base da fonte. Não aceita URLs de terceiros em uma playlist da fonte. Duplicatas são ignoradas.
+
+## 4. Validar a API antes do NX
+
+Use o usuário e a senha de bootstrap definidos acima:
+
+- Login/info: `GET /player_api.php?username=nx-teste&password=...`
+- Categorias: `GET /player_api.php?username=...&password=...&action=get_live_categories`
 - Canais: `GET /player_api.php?username=...&password=...&action=get_live_streams`
+- Filmes: `GET /player_api.php?username=...&password=...&action=get_vod_streams`
+- Séries: `GET /player_api.php?username=...&password=...&action=get_series`
 - Playlist: `GET /get.php?username=...&password=...&type=m3u_plus&output=ts`
+- XMLTV: `GET /xmltv.php?username=...&password=...`
 
-A playlist deve começar com `#EXTM3U` e conter endereços `/play/...` do próprio MDE.
+Para testar temporadas e episódios, cadastre uma mídia do tipo `series` e depois mídias do tipo `episode` vinculadas a ela com `series_id`, `season_number` e `episode_number`. Consulte `action=get_series_info&series_id=ID`.
 
-## 4. Configurar o NX IPTV
+Para testar EPG, cadastre um canal com `epg_channel_id` e importe XMLTV pelo painel/API em `POST /v1/admin/epg/import`. O endpoint XMLTV só exporta canais já cadastrados.
 
-Se o NX oferecer login Xtream Codes, informe:
-- **Servidor/URL:** endereço do PC onde o MDE está rodando, por exemplo `http://192.168.1.20:8000`.
-- **Usuário:** o valor de `MDE_BOOTSTRAP_USER`.
-- **Senha:** o valor de `MDE_BOOTSTRAP_PASSWORD`.
+## 5. Configurar o NX IPTV
 
-Se o NX estiver no mesmo PC, use `http://127.0.0.1:8000`. Se estiver em outro aparelho, use o IP local do PC e mantenha os dois na mesma rede Wi-Fi/LAN. Libere a porta 8000 no firewall do Windows apenas para a rede privada.
+Se o NX oferece login Xtream Codes:
 
-Se o NX aceitar somente M3U, use a URL `/get.php?username=...&password=...`.
+- **Servidor:** `http://127.0.0.1:8000` quando o NX roda no mesmo PC.
+- **Usuário:** `nx-teste` (ou o valor de `MDE_BOOTSTRAP_USER`).
+- **Senha:** a senha configurada em `MDE_BOOTSTRAP_PASSWORD`.
 
-## 5. Critérios de aprovação do primeiro teste
+Se o NX estiver em outro aparelho na mesma rede:
+1. Pare o Uvicorn com CTRL+C.
+2. Reinicie com `--host 0.0.0.0 --port 8000`.
+3. Descubra o IPv4 local do PC com `ipconfig`.
+4. Use no NX `http://IP-DO-PC:8000`.
+5. Libere a porta 8000 apenas para a rede privada no Firewall do Windows.
 
-- NX autentica no servidor.
-- NX carrega as categorias.
-- NX lista os canais cadastrados.
-- NX inicia uma mídia HLS autorizada.
-- No modo proxy, as playlists e os segmentos passam pelo MDE.
-- No modo redirect, o player recebe o redirecionamento para a origem autorizada.
+Não encaminhe essa porta no roteador e não exponha o serviço à internet.
 
-## Limitações conhecidas antes do teste
+Se o NX aceitar somente M3U, use `http://IP-DO-PC:8000/get.php?username=...&password=...`.
 
-- A compatibilidade foi testada por testes automatizados da API; ainda não foi validada dentro do aplicativo NX IPTV.
-- Séries, temporadas e episódios ainda não têm estrutura completa de catálogo e navegação.
-- XMLTV/EPG e painel administrativo visual completo ainda não estão implementados.
-- O proxy ainda precisa de fixação do IP validado na conexão para reduzir risco de DNS rebinding; não exponha o serviço publicamente.
-- Contagem/limite efetivo de conexões simultâneas ainda não está implementado.
-- O campo `output` da playlist não transforma o formato do conteúdo upstream. A extensão é uma indicação ao cliente, não uma transcodificação.
+## 6. Critérios de aprovação da integração
 
-O primeiro teste deve ocorrer na rede local, com conteúdo de teste autorizado e sem expor o servidor à internet.
+- Login Xtream aceito pelo NX.
+- Categorias e canais carregados.
+- Filmes e séries listados.
+- Detalhes das séries mostram temporadas e episódios.
+- EPG aparece para canais que têm programação cadastrada.
+- Ao abrir um canal HLS, o NX recebe a playlist e os segmentos.
+- O modo proxy mantém playlist/segmentos no endereço do MDE.
+- O modo redirect redireciona diretamente para a fonte cadastrada.
+
+## Limites que ainda exigem validação real
+
+- Ainda não foi executado teste dentro do aplicativo NX IPTV nesta etapa.
+- A validação de DNS bloqueia destinos privados e verifica redirects, mas ainda não fixa o IP resolvido na conexão HTTP; DNS rebinding residual impede recomendar exposição pública.
+- O limite de conexões é um lease baseado em IP + User-Agent e expira após inatividade. Clientes atrás do mesmo NAT ou que alterem User-Agent podem afetar a contagem.
+- SQLite está pronto para instalação local; PostgreSQL, alta disponibilidade e escalabilidade horizontal permanecem fora desta build.
+- O MDE entrega os formatos originais, não faz transcodificação. A extensão de URL não converte o conteúdo.
+- Compatibilidade final de cada player depende de suas particularidades Xtream/HLS, codecs e comportamento de autenticação.
+
+O teste inicial deve ser feito na rede local, com um catálogo de teste autorizado.
