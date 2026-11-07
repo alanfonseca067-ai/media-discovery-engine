@@ -142,6 +142,60 @@ class SourceIn(BaseModel):
         return self
 
 
+class SourceUpdate(BaseModel):
+    name: str | None = Field(default=None, min_length=1, max_length=120)
+    base_url: HttpUrl | None = None
+    delivery_mode: str | None = Field(default=None, pattern="^(redirect|proxy)$")
+    manifest_path: str | None = Field(default=None, max_length=2048)
+    catalog_media_type: str | None = Field(default=None, pattern="^(live|movie)$")
+    enabled: bool | None = None
+
+    @model_validator(mode="after")
+    def validate_source_update(self):
+        if self.base_url is not None:
+            parsed = urlsplit(str(self.base_url))
+            decoded = unquote(parsed.path)
+            if parsed.username or parsed.password or parsed.query or parsed.fragment:
+                raise ValueError("URL base não pode conter credenciais, query ou fragmento")
+            if "\\" in decoded or "\x00" in decoded or any(part == ".." for part in decoded.split("/")):
+                raise ValueError("Caminho base inválido")
+        if self.manifest_path is not None:
+            parsed = urlsplit(self.manifest_path.strip())
+            decoded = unquote(parsed.path)
+            if parsed.scheme or parsed.netloc or self.manifest_path.strip().startswith("//"):
+                raise ValueError("manifest_path deve ser relativo")
+            if "\\" in decoded or "\x00" in decoded or any(part == ".." for part in decoded.split("/")):
+                raise ValueError("manifest_path não pode sair da fonte")
+        return self
+
+
+class MediaUpdate(BaseModel):
+    title: str | None = Field(default=None, min_length=1, max_length=240)
+    source_id: int | None = Field(default=None, gt=0)
+    source_path: str | None = Field(default=None, min_length=1, max_length=2048)
+    category_id: int | None = None
+    enabled: bool | None = None
+    sort_order: int | None = None
+    plot: str | None = Field(default=None, max_length=10000)
+    cover_url: str | None = Field(default=None, max_length=2048)
+    release_date: str | None = Field(default=None, max_length=32)
+    duration: str | None = Field(default=None, max_length=32)
+    rating: str | None = Field(default=None, max_length=16)
+    epg_channel_id: str | None = Field(default=None, max_length=256)
+    tvg_id: str | None = Field(default=None, max_length=256)
+
+    @model_validator(mode="after")
+    def validate_relative_source_path(self):
+        if self.source_path is not None:
+            parsed = urlsplit(self.source_path)
+            decoded = unquote(parsed.path)
+            if parsed.scheme or parsed.netloc or self.source_path.startswith("//"):
+                raise ValueError("source_path deve ser relativo")
+            if "\\" in decoded or "\x00" in decoded or any(part == ".." for part in decoded.split("/")):
+                raise ValueError("source_path não pode sair da fonte")
+        return self
+
+
 class CategoryIn(BaseModel):
     name: str = Field(min_length=1, max_length=120)
     media_type: str = Field(pattern="^(live|movie|series)$")
@@ -279,6 +333,58 @@ def list_sources(x_mde_admin_key: str | None = Header(default=None)):
     return [dict(row) for row in rows]
 
 
+@app.patch("/v1/admin/sources/{source_id}")
+def update_source(
+    source_id: int,
+    payload: SourceUpdate,
+    x_mde_admin_key: str | None = Header(default=None),
+):
+    require_admin(x_mde_admin_key)
+    updates = payload.model_dump(exclude_unset=True)
+    if not updates:
+        raise HTTPException(status_code=422, detail="Informe ao menos um campo")
+    with connection() as db:
+        source = db.execute("SELECT id FROM sources WHERE id=?", (source_id,)).fetchone()
+        if not source:
+            raise HTTPException(status_code=404, detail="Fonte não encontrada")
+        assignments = []
+        values = []
+        for key, value in updates.items():
+            if key == "base_url" and value is not None:
+                value = str(value).rstrip("/")
+            if key == "enabled" and value is not None:
+                value = int(value)
+            assignments.append(f"{key}=?")
+            values.append(value)
+        values.append(source_id)
+        db.execute(
+            f"UPDATE sources SET {', '.join(assignments)} WHERE id=?",
+            values,
+        )
+    return {"updated": True, "source_id": source_id}
+
+
+@app.delete("/v1/admin/sources/{source_id}")
+def delete_source(source_id: int, x_mde_admin_key: str | None = Header(default=None)):
+    require_admin(x_mde_admin_key)
+    with connection() as db:
+        source = db.execute("SELECT id FROM sources WHERE id=?", (source_id,)).fetchone()
+        if not source:
+            raise HTTPException(status_code=404, detail="Fonte não encontrada")
+        used = db.execute(
+            "SELECT 1 FROM media_items WHERE source_id=? LIMIT 1",
+            (source_id,),
+        ).fetchone()
+        if used:
+            raise HTTPException(
+                status_code=409,
+                detail="A fonte possui mídias vinculadas; desative-a ou remova as mídias primeiro",
+            )
+        db.execute("DELETE FROM collection_jobs WHERE source_id=?", (source_id,))
+        db.execute("DELETE FROM sources WHERE id=?", (source_id,))
+    return {"deleted": True, "source_id": source_id}
+
+
 @app.post("/v1/admin/categories")
 def create_category(payload: CategoryIn, x_mde_admin_key: str | None = Header(default=None)):
     require_admin(x_mde_admin_key)
@@ -371,6 +477,18 @@ def update_user(
     return {"updated": True, "username": username}
 
 
+@app.delete("/v1/admin/users/{username}")
+def delete_user(username: str, x_mde_admin_key: str | None = Header(default=None)):
+    require_admin(x_mde_admin_key)
+    with connection() as db:
+        user = db.execute("SELECT id FROM users WHERE username=?", (username,)).fetchone()
+        if not user:
+            raise HTTPException(status_code=404, detail="Usuário não encontrado")
+        db.execute("DELETE FROM playback_sessions WHERE username=?", (username,))
+        db.execute("DELETE FROM users WHERE username=?", (username,))
+    return {"deleted": True, "username": username}
+
+
 @app.get("/v1/admin/media")
 def list_media(x_mde_admin_key: str | None = Header(default=None)):
     require_admin(x_mde_admin_key)
@@ -381,6 +499,71 @@ def list_media(x_mde_admin_key: str | None = Header(default=None)):
                FROM media_items ORDER BY media_type,sort_order,title"""
         ).fetchall()
     return [dict(row) for row in rows]
+
+
+@app.patch("/v1/admin/media/{media_id}")
+def update_media(
+    media_id: int,
+    payload: MediaUpdate,
+    x_mde_admin_key: str | None = Header(default=None),
+):
+    require_admin(x_mde_admin_key)
+    updates = payload.model_dump(exclude_unset=True)
+    if not updates:
+        raise HTTPException(status_code=422, detail="Informe ao menos um campo")
+    with connection() as db:
+        current = db.execute(
+            "SELECT id,media_type,category_id FROM media_items WHERE id=?",
+            (media_id,),
+        ).fetchone()
+        if not current:
+            raise HTTPException(status_code=404, detail="Mídia não encontrada")
+        if "source_id" in updates and updates["source_id"] is not None:
+            source = db.execute(
+                "SELECT id FROM sources WHERE id=? AND enabled=1",
+                (updates["source_id"],),
+            ).fetchone()
+            if not source:
+                raise HTTPException(status_code=404, detail="Fonte não encontrada ou desativada")
+        category_id = updates.get("category_id", current["category_id"])
+        if category_id is not None:
+            category = db.execute(
+                "SELECT media_type FROM categories WHERE id=?",
+                (category_id,),
+            ).fetchone()
+            expected = "live" if current["media_type"] == "live" else (
+                "movie" if current["media_type"] == "movie" else "series"
+            )
+            if not category or category["media_type"] != expected:
+                raise HTTPException(status_code=422, detail="Categoria incompatível com a mídia")
+        assignments = []
+        values = []
+        for key, value in updates.items():
+            if key == "enabled" and value is not None:
+                value = int(value)
+            if key == "title" and value is not None:
+                value = value.strip()
+            if key == "source_path" and value is not None:
+                value = value.strip()
+            assignments.append(f"{key}=?")
+            values.append(value)
+        values.append(media_id)
+        db.execute(
+            f"UPDATE media_items SET {', '.join(assignments)} WHERE id=?",
+            values,
+        )
+    return {"updated": True, "media_id": media_id}
+
+
+@app.delete("/v1/admin/media/{media_id}")
+def delete_media(media_id: int, x_mde_admin_key: str | None = Header(default=None)):
+    require_admin(x_mde_admin_key)
+    with connection() as db:
+        media = db.execute("SELECT id FROM media_items WHERE id=?", (media_id,)).fetchone()
+        if not media:
+            raise HTTPException(status_code=404, detail="Mídia não encontrada")
+        db.execute("DELETE FROM media_items WHERE id=?", (media_id,))
+    return {"deleted": True, "media_id": media_id}
 
 
 @app.post("/v1/admin/media")
