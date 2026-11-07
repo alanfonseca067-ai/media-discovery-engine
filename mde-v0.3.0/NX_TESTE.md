@@ -15,6 +15,8 @@ $env:MDE_DATABASE_PATH = "$PWD\mde-v030.sqlite3"
 $env:MDE_BOOTSTRAP_USER = "nx-teste"
 $env:MDE_BOOTSTRAP_PASSWORD = "troque-por-uma-senha-forte"
 $env:MDE_ADMIN_KEY = "troque-por-uma-chave-administrativa-longa"
+# Descomente somente se a origem de mídia do laboratório estiver no próprio PC:
+# $env:MDE_ALLOWED_PRIVATE_HOSTS = "127.0.0.1,localhost"
 uvicorn mde_v030.main:app --host 127.0.0.1 --port 8000
 ```
 
@@ -35,6 +37,8 @@ $env:MDE_DATABASE_PATH = "$PWD\mde-v030.sqlite3"
 $env:MDE_BOOTSTRAP_USER = "nx-teste"
 $env:MDE_BOOTSTRAP_PASSWORD = "troque-por-uma-senha-forte"
 $env:MDE_ADMIN_KEY = "troque-por-uma-chave-administrativa-longa"
+# Use a mesma allowlist do servidor se a playlist do laboratório for local:
+# $env:MDE_ALLOWED_PRIVATE_HOSTS = "127.0.0.1,localhost"
 python -m mde_v030.worker
 ```
 
@@ -101,7 +105,7 @@ Se o NX aceitar somente M3U, use `http://IP-DO-PC:8000/get.php?username=...&pass
 ## Limites que ainda exigem validação real
 
 - Ainda não foi executado teste dentro do aplicativo NX IPTV nesta etapa.
-- A validação de DNS bloqueia destinos privados e verifica redirects, mas ainda não fixa o IP resolvido na conexão HTTP; DNS rebinding residual impede recomendar exposição pública.
+- Por padrão, a validação bloqueia destinos privados e verifica redirects. Para laboratório local, uma allowlist explícita pode liberar somente os hosts privados informados. A conexão ainda não fixa o IP resolvido; DNS rebinding residual impede recomendar exposição pública.
 - O limite de conexões é um lease baseado em IP + User-Agent e expira após inatividade. Clientes atrás do mesmo NAT ou que alterem User-Agent podem afetar a contagem.
 - SQLite está pronto para instalação local; PostgreSQL, alta disponibilidade e escalabilidade horizontal permanecem fora desta build.
 - O MDE entrega os formatos originais, não faz transcodificação. A extensão de URL não converte o conteúdo.
