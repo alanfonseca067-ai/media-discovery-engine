@@ -29,6 +29,40 @@ O MDE 0.3.0 reúne catálogo, API no formato Xtream, entrega de mídia, EPG e co
 
 ## Instalação no Windows
 
+A forma mais simples é usar os scripts incluídos. Abra PowerShell na pasta `mde-v0.3.0`:
+
+```powershell
+Set-ExecutionPolicy -Scope Process -ExecutionPolicy Bypass
+.\install_windows.ps1
+.\configure_windows.ps1
+```
+
+O instalador cria o ambiente virtual, instala as dependências e executa os testes. O configurador pede usuário e senha iniciais, gera uma chave administrativa aleatória e grava as variáveis em `.env`. Esse arquivo está no `.gitignore`; não o envie nem compartilhe.
+
+Se a fonte de mídia do laboratório estiver no próprio PC, cadastre somente o host e a porta exatos que ela usa. Exemplo para uma origem em `127.0.0.1:8090`:
+
+```powershell
+.\configure_windows.ps1 -Force -PrivateHosts "127.0.0.1:8090,localhost:8090"
+```
+
+Depois inicie o servidor:
+
+```powershell
+.\start_server_windows.ps1
+```
+
+Para que outro aparelho na mesma rede acesse o MDE, use `.\start_server_windows.ps1 -Lan` e libere a porta somente para a rede privada no Firewall do Windows. Não encaminhe essa porta no roteador.
+
+Em um segundo PowerShell, na mesma pasta, inicie o worker:
+
+```powershell
+.\start_worker_windows.ps1
+```
+
+Os scripts usam o mesmo `.env` e o mesmo banco SQLite. O servidor inicia por padrão em `127.0.0.1:8000`. O servidor desativa o access log HTTP padrão para evitar registrar URLs Xtream que carregam credenciais.
+
+### Instalação manual
+
 Abra PowerShell na pasta `mde-v0.3.0`:
 
 ```powershell
