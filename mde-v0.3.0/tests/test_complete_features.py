@@ -230,12 +230,22 @@ https://other.example.test/live/blocked.m3u8
             (source.lastrowid,),
         )
         job_id = job.lastrowid
+        retry_job = db.execute(
+            "INSERT INTO collection_jobs(source_id,status) VALUES (?,'queued')",
+            (source.lastrowid,),
+        )
+        retry_job_id = retry_job.lastrowid
 
     result = worker.process_job(job_id)
     assert result["status"] == "completed"
     assert result["total_items"] == 2
     assert result["imported_items"] == 1
     assert result["skipped_items"] == 1
+
+    retry_result = worker.process_job(retry_job_id)
+    assert retry_result["status"] == "completed"
+    assert retry_result["imported_items"] == 0
+    assert retry_result["skipped_items"] == 2
 
     with database.connection() as db:
         items = db.execute(
