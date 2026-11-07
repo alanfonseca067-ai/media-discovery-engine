@@ -84,7 +84,7 @@ O campo `source_path` precisa ser relativo ao endereço base da fonte. O servido
 - Uma fonte cadastrada não garante que o conteúdo esteja disponível ou que o formato seja reproduzível. Use apenas mídia própria ou autorizada.
 - Não exponha esta versão de desenvolvimento diretamente à internet antes de concluir o endurecimento de DNS, configuração de hosts permitidos, HTTPS, gestão de segredos, limites de conexão e testes com players reais.
 
-## Endpoints
+## Integração com NX IPTV\n\nConsulte o roteiro completo em [NX_TESTE.md](NX_TESTE.md) para iniciar o servidor no Windows, cadastrar uma fonte autorizada, validar a API e configurar o cliente na rede local.\n\n## Endpoints
 
 - `GET /health`
 - `GET /player_api.php?username=...&password=...`
