@@ -14,3 +14,8 @@ def test_auth_rejects_bad_password():
     with TestClient(app) as client:
         response = client.get("/player_api.php", params={"username":"demo","password":"wrong"})
         assert response.status_code == 401
+
+def test_admin_routes_require_configured_key():
+    with TestClient(app) as client:
+        response = client.get("/v1/admin/sources")
+        assert response.status_code in (403, 503)
