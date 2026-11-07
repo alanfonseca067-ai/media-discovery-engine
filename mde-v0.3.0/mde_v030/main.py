@@ -685,6 +685,20 @@ def queue_collection(source_id: int, x_mde_admin_key: str | None = Header(defaul
         return {"job_id": cur.lastrowid, "status": "queued"}
 
 
+@app.get("/v1/admin/jobs")
+def list_collection_jobs(
+    limit: int = Query(default=50, ge=1, le=200),
+    x_mde_admin_key: str | None = Header(default=None),
+):
+    require_admin(x_mde_admin_key)
+    with connection() as db:
+        rows = db.execute(
+            "SELECT * FROM collection_jobs ORDER BY id DESC LIMIT ?",
+            (limit,),
+        ).fetchall()
+    return [dict(row) for row in rows]
+
+
 @app.get("/v1/admin/jobs/{job_id}")
 def get_collection_job(job_id: int, x_mde_admin_key: str | None = Header(default=None)):
     require_admin(x_mde_admin_key)
