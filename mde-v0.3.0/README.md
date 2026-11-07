@@ -191,7 +191,8 @@ A importação XMLTV não aceita DOCTYPE nem declarações de entidades e só gr
 | `POST /v1/admin/sources` | Cadastro de fontes |
 | `PATCH /v1/admin/sources/{id}` | Alterar fontes |
 | `DELETE /v1/admin/sources/{id}` | Remover fonte sem mídias vinculadas |
-| `POST /v1/admin/sources/{id}/probe` | Testar manifesto e validar entradas antes da coleta |\n| `POST /v1/admin/sources/{id}/collect` | Enfileirar coleta |
+| `POST /v1/admin/sources/{id}/probe` | Testar manifesto e validar entradas antes da coleta |
+| `POST /v1/admin/sources/{id}/collect` | Enfileirar coleta |
 | `POST /v1/admin/categories` | Cadastro de categorias |
 | `PATCH /v1/admin/categories/{id}` | Renomear categoria |
 | `DELETE /v1/admin/categories/{id}` | Remover categoria sem mídias vinculadas |
