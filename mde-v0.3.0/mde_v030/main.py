@@ -100,11 +100,15 @@ def clean_m3u(value: str) -> str:
     return value.replace("\r", " ").replace("\n", " ").replace('"', "'").strip()
 
 
-def _xmltv_time(value: str) -> str:
+def parse_utc_datetime(value: str) -> datetime:
     parsed = datetime.fromisoformat(value.replace("Z", "+00:00"))
     if parsed.tzinfo is None:
         parsed = parsed.replace(tzinfo=timezone.utc)
-    return parsed.astimezone(timezone.utc).strftime("%Y%m%d%H%M%S +0000")
+    return parsed.astimezone(timezone.utc)
+
+
+def _xmltv_time(value: str) -> str:
+    return parse_utc_datetime(value).strftime("%Y%m%d%H%M%S +0000")
 
 
 class SourceIn(BaseModel):
@@ -283,8 +287,8 @@ class EpgProgrammeIn(BaseModel):
 
     @model_validator(mode="after")
     def validate_range(self):
-        start = datetime.fromisoformat(self.start_at.replace("Z", "+00:00"))
-        end = datetime.fromisoformat(self.end_at.replace("Z", "+00:00"))
+        start = parse_utc_datetime(self.start_at)
+        end = parse_utc_datetime(self.end_at)
         if end <= start:
             raise ValueError("end_at precisa ser posterior a start_at")
         return self
@@ -1000,8 +1004,8 @@ def player_api(
                 "start": row["start_at"],
                 "end": row["end_at"],
                 "description": row["description"],
-                "start_timestamp": str(int(datetime.fromisoformat(row["start_at"].replace("Z", "+00:00")).timestamp())),
-                "stop_timestamp": str(int(datetime.fromisoformat(row["end_at"].replace("Z", "+00:00")).timestamp())),
+                "start_timestamp": str(int(parse_utc_datetime(row["start_at"]).timestamp())),
+                "stop_timestamp": str(int(parse_utc_datetime(row["end_at"]).timestamp())),
                 "now_playing": 0,
             }
             for row in programmes
