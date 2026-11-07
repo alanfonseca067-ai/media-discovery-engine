@@ -707,6 +707,18 @@ def create_media(payload: MediaIn, x_mde_admin_key: str | None = Header(default=
                 raise HTTPException(status_code=422, detail="series_id só pode ser usado em episódios")
             payload_category_id = payload.category_id
 
+        if payload.media_type == "episode":
+            duplicate_episode = db.execute(
+                """SELECT 1 FROM media_items WHERE parent_id=? AND season_number=?
+                   AND episode_number=? AND media_type='episode' LIMIT 1""",
+                (parent_id, payload.season_number, payload.episode_number),
+            ).fetchone()
+            if duplicate_episode:
+                raise HTTPException(
+                    status_code=409,
+                    detail="Já existe um episódio com esse número nesta temporada",
+                )
+
         cur = db.execute(
             """INSERT INTO media_items
                (title,media_type,category_id,source_id,source_path,enabled,sort_order,
@@ -783,6 +795,26 @@ def get_collection_job(job_id: int, x_mde_admin_key: str | None = Header(default
     if not row:
         raise HTTPException(status_code=404, detail="Job não encontrado")
     return dict(row)
+
+
+@app.post("/v1/admin/jobs/{job_id}/retry")
+def retry_collection_job(job_id: int, x_mde_admin_key: str | None = Header(default=None)):
+    require_admin(x_mde_admin_key)
+    with connection() as db:
+        row = db.execute(
+            "SELECT id,status FROM collection_jobs WHERE id=?",
+            (job_id,),
+        ).fetchone()
+        if not row:
+            raise HTTPException(status_code=404, detail="Job não encontrado")
+        if row["status"] not in {"failed", "completed"}:
+            raise HTTPException(status_code=409, detail="Somente jobs concluídos ou com falha podem ser reenfileirados")
+        db.execute(
+            """UPDATE collection_jobs SET status='queued',total_items=0,imported_items=0,
+               skipped_items=0,error='',updated_at=CURRENT_TIMESTAMP WHERE id=?""",
+            (job_id,),
+        )
+    return {"job_id": job_id, "status": "queued"}
 
 
 @app.post("/v1/admin/epg/programmes")
