@@ -45,7 +45,11 @@ def validate_public_url(value: str) -> str:
         if parsed.fragment:
             parsed = parsed._replace(fragment="")
         host = parsed.hostname.rstrip(".").lower()
-        explicitly_allowed_private = host in ALLOWED_PRIVATE_HOSTS
+        port = parsed.port or (443 if scheme == "https" else 80)
+        host_port = f"[{host}]:{port}" if ":" in host else f"{host}:{port}"
+        explicitly_allowed_private = (
+            host in ALLOWED_PRIVATE_HOSTS or host_port in ALLOWED_PRIVATE_HOSTS
+        )
         if (
             not explicitly_allowed_private
             and (
@@ -54,7 +58,6 @@ def validate_public_url(value: str) -> str:
             )
         ):
             raise ValueError("Host local não permitido; configure MDE_ALLOWED_PRIVATE_HOSTS apenas para testes controlados")
-        port = parsed.port or (443 if scheme == "https" else 80)
         if not 1 <= port <= 65535:
             raise ValueError("Porta inválida")
         try:
