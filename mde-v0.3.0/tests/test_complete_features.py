@@ -548,3 +548,27 @@ def test_m3u_basic_type_still_has_extinf_lines(client):
     )
     assert response.status_code == 200
     assert "#EXTINF:-1,M3U basic" in response.text
+
+
+def test_standard_xtream_live_movie_and_series_routes_exist(client, monkeypatch):
+    from fastapi.responses import JSONResponse
+
+    calls = []
+
+    async def fake_play(request, media_type, username, password, media_id):
+        calls.append((media_type, username, password, media_id, request.method))
+        return JSONResponse({"type": media_type, "id": media_id})
+
+    monkeypatch.setattr(main, "_play_item", fake_play)
+    live = client.get("/live/demo/change-this-password/71.ts")
+    movie = client.get("/movie/demo/change-this-password/72.mp4")
+    episode = client.get("/series/demo/change-this-password/73.mp4")
+
+    assert live.status_code == 200
+    assert movie.status_code == 200
+    assert episode.status_code == 200
+    assert calls == [
+        ("live", "demo", "change-this-password", 71, "GET"),
+        ("movie", "demo", "change-this-password", 72, "GET"),
+        ("episode", "demo", "change-this-password", 73, "GET"),
+    ]
