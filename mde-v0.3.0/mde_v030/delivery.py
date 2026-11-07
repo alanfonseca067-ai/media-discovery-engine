@@ -68,7 +68,12 @@ def validate_public_url(value: str) -> str:
                 raise ValueError("Host permitido sem endereço IP")
             for address in addresses:
                 ip = ipaddress.ip_address(address)
-                if not (ip.is_private or ip.is_loopback or ip.is_link_local):
+                if (
+                    not (ip.is_private or ip.is_loopback or ip.is_link_local)
+                    or ip.is_reserved
+                    or ip.is_multicast
+                    or ip.is_unspecified
+                ):
                     raise ValueError("Allowlist privada não permite endereços reservados ou públicos")
         return urlunsplit((scheme, parsed.netloc, parsed.path or "/", parsed.query, ""))
         return urlunsplit((scheme, parsed.netloc, parsed.path or "/", parsed.query, ""))
