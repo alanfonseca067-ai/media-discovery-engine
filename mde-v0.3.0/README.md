@@ -173,7 +173,7 @@ A importação XMLTV não aceita DOCTYPE nem declarações de entidades e só gr
 | `MDE_MAX_PLAYLIST_BYTES` | `2097152` | Tamanho máximo de playlist HLS |
 | `MDE_PLAYBACK_SESSION_TTL_SECONDS` | `120` | Validade do lease de sessão |
 | `MDE_COLLECTION_POLL_SECONDS` | `5` | Intervalo de consulta da fila |
-| `MDE_MAX_COLLECTION_BYTES` | `10485760` | Tamanho máximo do catálogo M3U |
+| `MDE_MAX_COLLECTION_BYTES` | `10485760` | Tamanho máximo do catálogo M3U |\n| `MDE_ALLOWED_PRIVATE_HOSTS` | vazio | Hosts privados explicitamente permitidos para laboratório; por exemplo `localhost,127.0.0.1` |
 
 ## Testes
 
@@ -187,7 +187,7 @@ O GitHub Actions executa a suíte no Python 3.12 em cada alteração do branch `
 
 - O MDE usa SQLite nesta versão. PostgreSQL, operação distribuída e implantação de alta disponibilidade ainda não fazem parte deste pacote.
 - A proteção de conexões simultâneas usa IP + User-Agent com lease de expiração. É um controle prático para teste local, mas dispositivos atrás do mesmo NAT ou clientes que alterem User-Agent podem fazer a contagem divergir. Não é um sistema de cobrança/DRM.
-- A validação de URL bloqueia IPs não públicos, nomes locais, credenciais embutidas, caminhos fora da fonte e redirecionamentos para outros destinos proibidos. Ainda existe risco residual de DNS rebinding entre a resolução e a conexão; a conexão com IP fixado e allowlist de CDN por fonte são requisitos antes de expor o serviço publicamente.
+- A validação de URL bloqueia IPs não públicos, nomes locais, credenciais embutidas, caminhos fora da fonte e redirecionamentos para outros destinos proibidos. A exceção `MDE_ALLOWED_PRIVATE_HOSTS` é opt-in, exige nomes/IPs exatos e deve ser usada somente em laboratório local. Ainda existe risco residual de DNS rebinding entre a resolução e a conexão; a conexão com IP fixado e allowlist de CDN por fonte são requisitos antes de expor o serviço publicamente.
 - No modo `redirect`, o player acessa diretamente a origem e vê seu endereço. No modo `proxy`, o endereço da origem não é incluído nas playlists HLS reescritas.
 - As URLs Xtream/M3U carregam usuário e senha no caminho por compatibilidade. Não compartilhe playlists e use HTTPS ao publicar o serviço.
 - O MDE não transcodifica mídia. A extensão informada ao cliente não converte TS, MP4, MKV ou HLS.
