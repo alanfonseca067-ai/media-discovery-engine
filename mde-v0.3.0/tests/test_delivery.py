@@ -51,4 +51,4 @@ def test_hls_rewrite_uses_persisted_opaque_resource_tokens(tmp_path, monkeypatch
     assert len(tokens) == 2
     assert len(set(tokens)) == 2
     for token in tokens:
-        assert delivery.get_resource_token(token, 42).startswith("https://upstream.example/")
+        assert delivery.get_resource_token(token, 42, "demo").startswith("https://upstream.example/")
