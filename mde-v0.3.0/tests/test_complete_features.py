@@ -572,3 +572,124 @@ def test_standard_xtream_live_movie_and_series_routes_exist(client, monkeypatch)
         ("movie", "demo", "change-this-password", 72, "GET"),
         ("episode", "demo", "change-this-password", 73, "GET"),
     ]
+
+
+def test_category_crud_and_delete_guard(client):
+    category = client.post(
+        "/v1/admin/categories",
+        headers=admin_headers(),
+        json={"name": "Rename me", "media_type": "live"},
+    )
+    assert category.status_code == 200
+    category_id = category.json()["id"]
+
+    renamed = client.patch(
+        f"/v1/admin/categories/{category_id}",
+        headers=admin_headers(),
+        json={"name": "Renamed category"},
+    )
+    assert renamed.status_code == 200
+    listed = client.get("/v1/admin/categories", headers=admin_headers())
+    assert any(item["id"] == category_id and item["name"] == "Renamed category" for item in listed.json())
+
+    source_id = create_source(client)
+    media = client.post(
+        "/v1/admin/media",
+        headers=admin_headers(),
+        json={
+            "title": "Uses category",
+            "media_type": "live",
+            "source_id": source_id,
+            "source_path": "live/uses-category.m3u8",
+            "category_id": category_id,
+        },
+    )
+    assert media.status_code == 200
+    blocked = client.delete(
+        f"/v1/admin/categories/{category_id}",
+        headers=admin_headers(),
+    )
+    assert blocked.status_code == 409
+
+    client.delete(f"/v1/admin/media/{media.json()['id']}", headers=admin_headers())
+    deleted = client.delete(
+        f"/v1/admin/categories/{category_id}",
+        headers=admin_headers(),
+    )
+    assert deleted.status_code == 200
+
+
+def test_collection_job_can_be_retried_after_completion(client):
+    source_id = create_source(client)
+    created = client.post(
+        "/v1/admin/sources",
+        headers=admin_headers(),
+        json={
+            "name": "Retry source",
+            "base_url": "https://retry.example.test",
+            "manifest_path": "retry.m3u",
+            "catalog_media_type": "live",
+            "delivery_mode": "proxy",
+        },
+    )
+    assert created.status_code == 200
+    retry_source_id = created.json()["id"]
+    job = client.post(
+        f"/v1/admin/sources/{retry_source_id}/collect",
+        headers=admin_headers(),
+    )
+    assert job.status_code == 200
+    job_id = job.json()["job_id"]
+    retried = client.post(
+        f"/v1/admin/jobs/{job_id}/retry",
+        headers=admin_headers(),
+    )
+    assert retried.status_code == 409
+    with database.connection() as db:
+        db.execute(
+            "UPDATE collection_jobs SET status='completed' WHERE id=?",
+            (job_id,),
+        )
+    retried = client.post(
+        f"/v1/admin/jobs/{job_id}/retry",
+        headers=admin_headers(),
+    )
+    assert retried.status_code == 200
+    assert retried.json()["status"] == "queued"
+
+
+def test_duplicate_episode_numbers_are_rejected(client):
+    source_id = create_source(client)
+    category = client.post(
+        "/v1/admin/categories",
+        headers=admin_headers(),
+        json={"name": "Duplicate season", "media_type": "series"},
+    ).json()
+    series = client.post(
+        "/v1/admin/media",
+        headers=admin_headers(),
+        json={
+            "title": "One series",
+            "media_type": "series",
+            "source_id": source_id,
+            "source_path": "meta/series",
+            "category_id": category["id"],
+        },
+    ).json()
+    episode_payload = {
+        "title": "Episode one",
+        "media_type": "episode",
+        "source_id": source_id,
+        "source_path": "series/episode1.m3u8",
+        "series_id": series["id"],
+        "season_number": 1,
+        "episode_number": 1,
+    }
+    first = client.post("/v1/admin/media", headers=admin_headers(), json=episode_payload)
+    assert first.status_code == 200
+    second = client.post(
+        "/v1/admin/media",
+        headers=admin_headers(),
+        json={**episode_payload, "title": "Duplicate episode"},
+    )
+    assert second.status_code == 409
