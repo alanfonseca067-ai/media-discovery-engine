@@ -1118,7 +1118,7 @@ def get_playlist(
             lines.append(
                 f'#EXTINF:-1 tvg-id="{tvg_id}" tvg-name="{title}" group-title="{group}",{title}'
             )
-        lines.append(f"{base}/play/{kind}/{safe_user}/{safe_pass}/{row['id']}.{extension}")
+        lines.append(f"{base}/{kind}/{safe_user}/{safe_pass}/{row['id']}.{extension}")
     return "\n".join(lines) + "\n"
 
 
@@ -1175,6 +1175,44 @@ async def play_media(
     if extension.lower() not in {"ts", "mp4", "mkv", "m3u8", "m3u", "aac", "mp3"}:
         raise HTTPException(status_code=404, detail="Formato não permitido")
     return await _play_item(request, media_type, username, password, media_id)
+
+
+async def _play_xtream_path(
+    request: Request,
+    media_type: str,
+    username: str,
+    password: str,
+    media_file: str,
+):
+    try:
+        media_id_text, extension = media_file.rsplit(".", 1)
+        media_id = int(media_id_text)
+    except (ValueError, AttributeError):
+        raise HTTPException(status_code=404, detail="Mídia não encontrada")
+    allowed = {"ts", "m3u8", "m3u", "aac", "mp3"} if media_type == "live" else {"mp4", "mkv", "m3u8", "ts"}
+    if extension.lower() not in allowed:
+        raise HTTPException(status_code=404, detail="Formato não permitido")
+    return await _play_item(request, media_type, username, password, media_id)
+
+
+@app.api_route("/live/{username}/{password}/{media_file}", methods=["GET", "HEAD"])
+async def xtream_live(
+    request: Request,
+    username: str,
+    password: str,
+    media_file: str,
+):
+    return await _play_xtream_path(request, "live", username, password, media_file)
+
+
+@app.api_route("/movie/{username}/{password}/{media_file}", methods=["GET", "HEAD"])
+async def xtream_movie(
+    request: Request,
+    username: str,
+    password: str,
+    media_file: str,
+):
+    return await _play_xtream_path(request, "movie", username, password, media_file)
 
 
 @app.api_route("/series/{username}/{password}/{media_file}", methods=["GET", "HEAD"])
