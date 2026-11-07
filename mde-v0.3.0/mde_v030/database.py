@@ -33,14 +33,22 @@ CREATE TABLE IF NOT EXISTS media_items (
  enabled INTEGER NOT NULL DEFAULT 1,
  sort_order INTEGER NOT NULL DEFAULT 0
 );
+CREATE TABLE IF NOT EXISTS proxy_resources (
+ token TEXT PRIMARY KEY,
+ media_id INTEGER NOT NULL REFERENCES media_items(id) ON DELETE CASCADE,
+ upstream_url TEXT NOT NULL,
+ expires_at INTEGER NOT NULL
+);
+CREATE INDEX IF NOT EXISTS idx_proxy_resources_expiry ON proxy_resources(expires_at);
 """
 
 @contextmanager
 def connection():
     DATABASE_PATH.parent.mkdir(parents=True, exist_ok=True)
-    db = sqlite3.connect(DATABASE_PATH)
+    db = sqlite3.connect(DATABASE_PATH, timeout=30)
     db.row_factory = sqlite3.Row
     db.execute("PRAGMA foreign_keys = ON")
+    db.execute("PRAGMA journal_mode = WAL")
     try:
         yield db
         db.commit()
