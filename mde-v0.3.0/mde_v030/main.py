@@ -1005,6 +1005,9 @@ small{color:#9ca3af}
 <section><h2>Coleta de catálogo</h2><form id="collectForm">
 <input name="source_id" type="number" placeholder="ID da fonte" required>
 <button>Enfileirar coleta</button></form><small>Execute o processo worker em outro terminal para processar a fila.</small></section>
+<section><h2>Importar guia XMLTV</h2><form id="epgImportForm">
+<textarea id="epgXml" rows="6" placeholder="Cole o conteúdo XMLTV autorizado aqui" required></textarea>
+<button>Importar XMLTV</button></form><small>Somente canais com EPG ID já cadastrado serão importados.</small></section>
 <section><h2>Visão geral</h2><pre id="output">Clique em Atualizar painel.</pre></section>
 </main><script>
 const keyInput=document.getElementById("key"),statusNode=document.getElementById("status"),output=document.getElementById("output");
@@ -1014,6 +1017,7 @@ function formData(form){const obj=Object.fromEntries(new FormData(form).entries(
 function bind(id,path,method="POST"){document.getElementById(id).addEventListener("submit",async e=>{e.preventDefault();try{const result=await api(path,method,formData(e.target));statusNode.textContent="Salvo: "+JSON.stringify(result);e.target.reset();}catch(err){statusNode.textContent="Erro: "+err.message}})}
 bind("sourceForm","/v1/admin/sources");bind("categoryForm","/v1/admin/categories");bind("userForm","/v1/admin/users");bind("mediaForm","/v1/admin/media");
 document.getElementById("collectForm").addEventListener("submit",async e=>{e.preventDefault();try{const d=formData(e.target);const r=await api("/v1/admin/sources/"+d.source_id+"/collect","POST",{});statusNode.textContent="Coleta: "+JSON.stringify(r)}catch(err){statusNode.textContent="Erro: "+err.message}});
+document.getElementById("epgImportForm").addEventListener("submit",async e=>{e.preventDefault();try{const xml=document.getElementById("epgXml").value;const r=await api("/v1/admin/epg/import","POST",{xml_content:xml});statusNode.textContent="EPG: "+JSON.stringify(r)}catch(err){statusNode.textContent="Erro: "+err.message}});
 async function refreshAll(){try{const results={stats:await api("/v1/stats"),sources:await api("/v1/admin/sources"),categories:await api("/v1/admin/categories"),users:await api("/v1/admin/users"),media:await api("/v1/admin/media"),epg:await api("/v1/admin/epg/programmes")};output.textContent=JSON.stringify(results,null,2);statusNode.textContent="Painel atualizado"}catch(err){statusNode.textContent="Erro: "+err.message}}
 </script></body></html>"""
 
