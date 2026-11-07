@@ -182,6 +182,7 @@ def process_job(job_id: int) -> dict:
         imported = 0
         skipped = 0
         with connection() as db:
+            db.execute("BEGIN IMMEDIATE")
             for entry in entries:
                 try:
                     source_path = resolve_catalog_entry(base_url, entry.uri, manifest_url)
