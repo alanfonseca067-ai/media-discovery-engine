@@ -65,12 +65,12 @@ def _same_origin(left: str, right: str) -> bool:
     )
 
 
-def resolve_catalog_entry(base_url: str, uri: str) -> str:
+def resolve_catalog_entry(base_url: str, uri: str, reference_url: str | None = None) -> str:
     parsed = urlsplit(uri)
     if parsed.scheme or parsed.netloc:
         candidate = uri
     else:
-        candidate = urljoin(base_url.rstrip("/") + "/", uri)
+        candidate = urljoin(reference_url or (base_url.rstrip("/") + "/"), uri)
     safe = validate_public_url(candidate)
     if not _same_origin(base_url, safe):
         raise ValueError("A entrada aponta para outro host ou porta; importação recusada")
@@ -87,7 +87,7 @@ def resolve_catalog_entry(base_url: str, uri: str) -> str:
     return urlunsplit(("", "", relative, target.query, ""))
 
 
-def fetch_catalog(source_base_url: str, manifest_path: str) -> str:
+def fetch_catalog(source_base_url: str, manifest_path: str) -> tuple[str, str]:
     manifest_url = validate_public_url(
         urljoin(source_base_url.rstrip("/") + "/", manifest_path.lstrip("/"))
     )
@@ -112,10 +112,15 @@ def fetch_catalog(source_base_url: str, manifest_path: str) -> str:
                     raise ValueError("Redirecionamento saiu do host cadastrado")
                 continue
             response.raise_for_status()
-            body = response.content
-            if len(body) > MAX_COLLECTION_BYTES:
-                raise ValueError("Manifesto excede o tamanho máximo configurado")
-            return body.decode("utf-8-sig")
+            chunks = []
+            size = 0
+            for chunk in response.iter_bytes():
+                size += len(chunk)
+                if size > MAX_COLLECTION_BYTES:
+                    raise ValueError("Manifesto excede o tamanho máximo configurado")
+                chunks.append(chunk)
+            body = b"".join(chunks)
+            return body.decode("utf-8-sig"), current
     raise ValueError("Limite de redirecionamentos do manifesto excedido")
 
 
@@ -153,14 +158,14 @@ def process_job(job_id: int) -> dict:
         media_type = source["catalog_media_type"]
 
     try:
-        content = fetch_catalog(base_url, manifest_path)
+        content, manifest_url = fetch_catalog(base_url, manifest_path)
         entries = parse_m3u(content)
         imported = 0
         skipped = 0
         with connection() as db:
             for entry in entries:
                 try:
-                    source_path = resolve_catalog_entry(base_url, entry.uri)
+                    source_path = resolve_catalog_entry(base_url, entry.uri, manifest_url)
                 except Exception:
                     skipped += 1
                     continue
@@ -177,7 +182,13 @@ def process_job(job_id: int) -> dict:
                     category_id = cursor.lastrowid
                 else:
                     category_id = category["id"]
-                before = db.total_changes
+                duplicate = db.execute(
+                    "SELECT 1 FROM media_items WHERE source_id=? AND source_path=?",
+                    (source["id"], source_path),
+                ).fetchone()
+                if duplicate:
+                    skipped += 1
+                    continue
                 db.execute(
                     """INSERT OR IGNORE INTO media_items
                        (title,media_type,category_id,source_id,source_path,enabled,
@@ -193,8 +204,7 @@ def process_job(job_id: int) -> dict:
                         entry.tvg_id,
                     ),
                 )
-                imported += int(db.total_changes > before)
-                skipped += int(db.total_changes == before)
+                imported += 1
             db.execute(
                 """UPDATE collection_jobs SET status='completed',total_items=?,
                    imported_items=?,skipped_items=?,error='',updated_at=CURRENT_TIMESTAMP
