@@ -1,5 +1,6 @@
 import hashlib
 import hmac
+from contextlib import asynccontextmanager
 import html
 import time
 from datetime import datetime, timezone
@@ -20,16 +21,18 @@ from .delivery import (
 )
 from .security import hash_password, verify_password
 
+@asynccontextmanager
+async def lifespan(application: FastAPI):
+    init_db()
+    yield
+
+
 app = FastAPI(
     title="MDE 0.3.0",
     version="0.3.0",
     description="Catálogo, API Xtream, coleta autorizada e entrega de mídia.",
+    lifespan=lifespan,
 )
-
-
-@app.on_event("startup")
-def startup():
-    init_db()
 
 
 def authenticate(username: str, password: str):
