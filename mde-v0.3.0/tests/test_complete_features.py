@@ -339,3 +339,40 @@ def test_admin_panel_is_available(client):
     assert response.status_code == 200
     assert "Media Discovery Engine" in response.text
     assert "X-MDE-Admin-Key" in response.text
+
+
+def test_admin_rejects_non_relative_source_and_manifest_paths(client):
+    bad_source = client.post(
+        "/v1/admin/sources",
+        headers=admin_headers(),
+        json={
+            "name": "Bad source",
+            "base_url": "https://media.example.test",
+            "manifest_path": "../outside/catalog.m3u",
+            "delivery_mode": "proxy",
+        },
+    )
+    assert bad_source.status_code == 422
+
+    source_id = create_source(client)
+    bad_media = client.post(
+        "/v1/admin/media",
+        headers=admin_headers(),
+        json={
+            "title": "Bad path",
+            "media_type": "live",
+            "source_id": source_id,
+            "source_path": "%2e%2e/private/secret.m3u8",
+        },
+    )
+    assert bad_media.status_code == 422
+
+
+def test_worker_rejects_encoded_parent_directory_escape(monkeypatch):
+    monkeypatch.setattr(worker, "validate_public_url", lambda value: value)
+    with pytest.raises(ValueError):
+        worker.resolve_catalog_entry(
+            "https://media.example.test/catalog",
+            "%2e%2e/private/secret.m3u8",
+            "https://media.example.test/catalog/list.m3u",
+        )
