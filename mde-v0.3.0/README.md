@@ -181,18 +181,30 @@ A importação XMLTV não aceita DOCTYPE nem declarações de entidades e só gr
 | `GET /player_api.php` | Login e ações Xtream |
 | `GET /get.php` | Playlist M3U |
 | `GET /xmltv.php` | Guia XMLTV |
-| `GET /live/{username}/{password}/{id}.ts` | Reprodução Xtream de canal |\n| `GET /play/live/...` | Alias de reprodução de canal |
-| `GET /movie/{username}/{password}/{id}.mp4` | Reprodução Xtream de filme |\n| `GET /play/movie/...` | Alias de reprodução de filme |
+| `GET /live/{username}/{password}/{id}.ts` | Reprodução Xtream de canal |
+| `GET /play/live/...` | Alias de reprodução de canal |
+| `GET /movie/{username}/{password}/{id}.mp4` | Reprodução Xtream de filme |
+| `GET /play/movie/...` | Alias de reprodução de filme |
 | `GET /series/{username}/{password}/{episode_id}.mp4` | Reprodução Xtream de episódio |
 | `GET /play-resource/...` | Segmentos e recursos HLS pelo proxy |
 | `GET /admin` | Painel administrativo |
-| `POST /v1/admin/sources` | Cadastro de fontes |\n| `PATCH /v1/admin/sources/{id}` | Alterar fontes |\n| `DELETE /v1/admin/sources/{id}` | Remover fonte sem mídias vinculadas |
+| `POST /v1/admin/sources` | Cadastro de fontes |
+| `PATCH /v1/admin/sources/{id}` | Alterar fontes |
+| `DELETE /v1/admin/sources/{id}` | Remover fonte sem mídias vinculadas |
 | `POST /v1/admin/sources/{id}/collect` | Enfileirar coleta |
-| `POST /v1/admin/categories` | Cadastro de categorias |\n| `PATCH /v1/admin/categories/{id}` | Renomear categoria |\n| `DELETE /v1/admin/categories/{id}` | Remover categoria sem mídias vinculadas |
-| `POST /v1/admin/media` | Cadastro de mídia |\n| `PATCH /v1/admin/media/{id}` | Alterar mídia |\n| `DELETE /v1/admin/media/{id}` | Remover mídia (séries também removem episódios vinculados) |
-| `POST /v1/admin/users` | Cadastro de usuários |\n| `PATCH /v1/admin/users/{username}` | Alterar usuário |\n| `DELETE /v1/admin/users/{username}` | Remover usuário |
+| `POST /v1/admin/categories` | Cadastro de categorias |
+| `PATCH /v1/admin/categories/{id}` | Renomear categoria |
+| `DELETE /v1/admin/categories/{id}` | Remover categoria sem mídias vinculadas |
+| `POST /v1/admin/media` | Cadastro de mídia |
+| `PATCH /v1/admin/media/{id}` | Alterar mídia |
+| `DELETE /v1/admin/media/{id}` | Remover mídia (séries também removem episódios vinculados) |
+| `POST /v1/admin/users` | Cadastro de usuários |
+| `PATCH /v1/admin/users/{username}` | Alterar usuário |
+| `DELETE /v1/admin/users/{username}` | Remover usuário |
 | `POST /v1/admin/epg/import` | Importar XMLTV |
-| `GET /v1/admin/jobs` | Listagem de coletas |\n| `POST /v1/admin/jobs/{id}/retry` | Reenfileirar coleta concluída ou com falha |\n| `GET /v1/stats` | Estatísticas administrativas |
+| `GET /v1/admin/jobs` | Listagem de coletas |
+| `POST /v1/admin/jobs/{id}/retry` | Reenfileirar coleta concluída ou com falha |
+| `GET /v1/stats` | Estatísticas administrativas |
 
 ## Configurações
 
@@ -207,7 +219,8 @@ A importação XMLTV não aceita DOCTYPE nem declarações de entidades e só gr
 | `MDE_MAX_PLAYLIST_BYTES` | `2097152` | Tamanho máximo de playlist HLS |
 | `MDE_PLAYBACK_SESSION_TTL_SECONDS` | `120` | Validade do lease de sessão |
 | `MDE_COLLECTION_POLL_SECONDS` | `5` | Intervalo de consulta da fila |
-| `MDE_MAX_COLLECTION_BYTES` | `10485760` | Tamanho máximo do catálogo M3U |\n| `MDE_ALLOWED_PRIVATE_HOSTS` | vazio | Hosts privados explicitamente permitidos para laboratório; por exemplo `127.0.0.1:8090,localhost:8090` |
+| `MDE_MAX_COLLECTION_BYTES` | `10485760` | Tamanho máximo do catálogo M3U |
+| `MDE_ALLOWED_PRIVATE_HOSTS` | vazio | Hosts privados explicitamente permitidos para laboratório; por exemplo `127.0.0.1:8090,localhost:8090` |
 
 ## Testes
 
