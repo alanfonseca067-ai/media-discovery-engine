@@ -106,3 +106,46 @@ def test_expired_user_is_rejected(client):
         params={"username": "demo", "password": "change-this-password"},
     )
     assert response.status_code == 401
+
+
+def test_xtream_vod_info_and_category_filter(client):
+    headers = {"X-MDE-Admin-Key": "test-admin-secret"}
+    source = client.post(
+        "/v1/admin/sources",
+        headers=headers,
+        json={"name": "VOD source", "base_url": "https://vod.example.net", "delivery_mode": "redirect"},
+    ).json()
+    category = client.post(
+        "/v1/admin/categories",
+        headers=headers,
+        json={"name": "Movies", "media_type": "movie"},
+    ).json()
+    movie = client.post(
+        "/v1/admin/media",
+        headers=headers,
+        json={
+            "title": "Test movie", "media_type": "movie",
+            "source_id": source["id"], "source_path": "movie/test.mp4",
+            "category_id": category["id"],
+        },
+    ).json()
+
+    filtered = client.get(
+        "/player_api.php",
+        params={
+            "username": "demo", "password": "change-this-password",
+            "action": "get_vod_streams", "category_id": category["id"],
+        },
+    )
+    assert filtered.status_code == 200
+    assert [entry["stream_id"] for entry in filtered.json()] == [movie["id"]]
+
+    info = client.get(
+        "/player_api.php",
+        params={
+            "username": "demo", "password": "change-this-password",
+            "action": "get_vod_info", "vod_id": movie["id"],
+        },
+    )
+    assert info.status_code == 200
+    assert info.json()["movie_data"]["stream_id"] == movie["id"]
