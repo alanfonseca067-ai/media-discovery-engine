@@ -74,7 +74,7 @@ $env:MDE_DATABASE_PATH = "$PWD\mde-v030.sqlite3"
 $env:MDE_BOOTSTRAP_USER = "nx-teste"
 $env:MDE_BOOTSTRAP_PASSWORD = "troque-por-uma-senha-forte"
 $env:MDE_ADMIN_KEY = "troque-por-uma-chave-administrativa-longa"
-uvicorn mde_v030.main:app --host 127.0.0.1 --port 8000
+uvicorn mde_v030.main:app --host 127.0.0.1 --port 8000 --no-access-log
 ```
 
 Abra:
