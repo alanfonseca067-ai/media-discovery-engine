@@ -53,7 +53,7 @@ No painel, informe a chave de `MDE_ADMIN_KEY`. Cadastre uma fonte com:
 - `catalog_media_type`: `live` para canais ou `movie` para filmes.
 - `delivery_mode`: `proxy` ou `redirect`.
 
-Clique em enfileirar coleta, ou no Swagger execute `POST /v1/admin/sources/{source_id}/collect`. Consulte o resultado em `GET /v1/admin/jobs/{job_id}` ou no painel.
+Primeiro execute `POST /v1/admin/sources/{source_id}/probe` no Swagger para testar o manifesto e conferir quantas entradas são válidas sem importá-las. Depois clique em enfileirar coleta ou execute `POST /v1/admin/sources/{source_id}/collect`. Consulte o resultado em `GET /v1/admin/jobs/{job_id}` ou no painel.
 
 O worker só importa entradas do mesmo protocolo, host e porta e dentro do caminho base da fonte. Não aceita URLs de terceiros em uma playlist da fonte. Duplicatas são ignoradas.
 
