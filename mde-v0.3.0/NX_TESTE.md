@@ -2,22 +2,30 @@
 
 Este roteiro instala o servidor, o painel e o worker e valida a API antes de cadastrar o MDE no NX. Use somente fontes e mídias próprias ou autorizadas.
 
-## 1. Instalar no Windows
+## 1. Instalar e configurar no Windows
 
 Extraia o ZIP do branch `mde-0.3.0`. Abra PowerShell na pasta `mde-v0.3.0`:
 
 ```powershell
-py -3.12 -m venv .venv
-.venv\Scripts\Activate.ps1
-python -m pip install --upgrade pip
-python -m pip install -e ".[dev]"
-$env:MDE_DATABASE_PATH = "$PWD\mde-v030.sqlite3"
-$env:MDE_BOOTSTRAP_USER = "nx-teste"
-$env:MDE_BOOTSTRAP_PASSWORD = "troque-por-uma-senha-forte"
-$env:MDE_ADMIN_KEY = "troque-por-uma-chave-administrativa-longa"
-# Descomente somente se a origem de mídia do laboratório estiver no próprio PC:
-# $env:MDE_ALLOWED_PRIVATE_HOSTS = "127.0.0.1:8090,localhost:8090"
-uvicorn mde_v030.main:app --host 127.0.0.1 --port 8000
+Set-ExecutionPolicy -Scope Process -ExecutionPolicy Bypass
+.\install_windows.ps1
+.\configure_windows.ps1
+```
+
+O instalador cria o ambiente virtual, instala as dependências e executa os testes. O configurador pede usuário/senha e gera uma chave administrativa. As informações ficam no arquivo local `.env`, que está ignorado pelo Git.
+
+Se sua fonte de mídia de laboratório rodar no próprio PC, informe somente host e porta exatos. Exemplo para serviço local na porta 8090:
+
+```powershell
+.\configure_windows.ps1 -Force -PrivateHosts "127.0.0.1:8090,localhost:8090"
+```
+
+Guarde o usuário e senha exibidos pelo configurador para cadastrar no NX. Não compartilhe o arquivo `.env`.
+
+Para executar o servidor, no primeiro PowerShell:
+
+```powershell
+.\start_server_windows.ps1
 ```
 
 Abra:
@@ -25,24 +33,17 @@ Abra:
 - Saúde: `http://127.0.0.1:8000/health`
 - API/Swagger: `http://127.0.0.1:8000/docs`
 
-Deixe esse terminal aberto.
+O servidor inicia apenas em loopback. Para um NX em outro aparelho da mesma rede, use `.\start_server_windows.ps1 -Lan`, depois o IPv4 do PC e porta 8000. Libere a porta somente para a rede privada no Firewall do Windows; não encaminhe a porta no roteador.
 
 ## 2. Iniciar o worker de coleta
 
-Abra outro PowerShell na mesma pasta e configure o mesmo ambiente e banco:
+Abra outro PowerShell na mesma pasta e execute:
 
 ```powershell
-.venv\Scripts\Activate.ps1
-$env:MDE_DATABASE_PATH = "$PWD\mde-v030.sqlite3"
-$env:MDE_BOOTSTRAP_USER = "nx-teste"
-$env:MDE_BOOTSTRAP_PASSWORD = "troque-por-uma-senha-forte"
-$env:MDE_ADMIN_KEY = "troque-por-uma-chave-administrativa-longa"
-# Use a mesma allowlist do servidor se a playlist do laboratório for local:
-# $env:MDE_ALLOWED_PRIVATE_HOSTS = "127.0.0.1:8090,localhost:8090"
-python -m mde_v030.worker
+.\start_worker_windows.ps1
 ```
 
-Deixe esse terminal aberto também. O worker processa os jobs enfileirados. Para processar somente uma vez e sair, use `python -m mde_v030.worker --once`.
+O worker usa o mesmo arquivo `.env` e o mesmo banco SQLite do servidor. Deixe esse terminal aberto também. Para processar somente uma vez e sair, use `.\start_worker_windows.ps1 -Once`.
 
 ## 3. Cadastrar e coletar um catálogo autorizado
 
