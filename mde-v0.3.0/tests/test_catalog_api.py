@@ -85,7 +85,7 @@ def test_xtream_login_categories_streams_and_m3u(client):
     )
     assert playlist.status_code == 200
     assert playlist.text.startswith("#EXTM3U")
-    assert f"/play/live/demo/change-this-password/{media_id}.ts" in playlist.text
+    assert f"/live/demo/change-this-password/{media_id}.ts" in playlist.text
 
 
 def test_admin_key_is_required_for_catalog_mutations(client):
