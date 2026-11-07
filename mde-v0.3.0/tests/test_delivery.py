@@ -52,3 +52,29 @@ def test_hls_rewrite_uses_persisted_opaque_resource_tokens(tmp_path, monkeypatch
     assert len(set(tokens)) == 2
     for token in tokens:
         assert delivery.get_resource_token(token, 42, "demo").startswith("https://upstream.example/")
+
+
+def test_source_path_rejects_parent_directory_escape():
+    with pytest.raises(HTTPException) as error:
+        delivery.resolve_source_url("https://media.example/base", "../outside/stream.m3u8")
+    assert error.value.status_code == 400
+
+
+def test_proxy_resource_token_is_bound_to_user(tmp_path, monkeypatch):
+    monkeypatch.setattr(database, "DATABASE_PATH", tmp_path / "bound-token.sqlite3")
+    database.init_db()
+    with database.connection() as db:
+        source = db.execute(
+            "INSERT INTO sources(name,base_url,delivery_mode,enabled) VALUES (?,?,?,1)",
+            ("test", "https://upstream.example", "proxy"),
+        )
+        db.execute(
+            "INSERT INTO media_items(id,title,media_type,source_id,source_path,enabled) VALUES (7,?,?,?,?,1)",
+            ("private token test", "live", source.lastrowid, "live/master.m3u8"),
+        )
+    monkeypatch.setattr(delivery, "validate_public_url", lambda value: value)
+    token = delivery.create_resource_token(7, "https://upstream.example/segment.ts", "alice")
+    assert delivery.get_resource_token(token, 7, "alice") == "https://upstream.example/segment.ts"
+    with pytest.raises(HTTPException) as error:
+        delivery.get_resource_token(token, 7, "bob")
+    assert error.value.status_code == 404
