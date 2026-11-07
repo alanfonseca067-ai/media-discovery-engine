@@ -1491,7 +1491,8 @@ small{color:#9ca3af}.status{margin-left:10px;color:#93c5fd}.muted{color:#9ca3af}
 <select name="delivery_mode"><option value="">Manter modo atual</option><option value="proxy">Proxy</option><option value="redirect">Redirect</option></select>
 <select name="enabled"><option value="">Manter estado</option><option value="true">Ativa</option><option value="false">Desativada</option></select>
 <button>Atualizar fonte</button></form>
-<form id="sourceDeleteForm"><input name="source_id" type="number" placeholder="ID da fonte para excluir" required><button class="danger">Excluir fonte sem mídias</button></form></section>
+<form id="sourceDeleteForm"><input name="source_id" type="number" placeholder="ID da fonte para excluir" required><button class="danger">Excluir fonte sem mídias</button></form>
+<form id="sourceProbeForm"><input name="source_id" type="number" placeholder="ID da fonte para testar" required><button>Testar playlist da fonte</button></form></section>
 <section><h2>Editar mídia</h2><form id="mediaUpdateForm">
 <input name="media_id" type="number" placeholder="ID da mídia" required>
 <input name="title" placeholder="Novo título (opcional)">
@@ -1548,6 +1549,7 @@ bindPatch("mediaUpdateForm","media_id","/v1/admin/media/");
 bindPatch("userUpdateForm","username","/v1/admin/users/");
 bindPatch("categoryUpdateForm","category_id","/v1/admin/categories/");
 bindDelete("sourceDeleteForm","source_id","/v1/admin/sources/");
+document.getElementById("sourceProbeForm").addEventListener("submit",async e=>{e.preventDefault();try{const d=formData(e.target);const r=await api("/v1/admin/sources/"+d.source_id+"/probe","POST",{});statusNode.textContent="Teste da fonte: "+JSON.stringify(r);output.textContent=JSON.stringify(r,null,2)}catch(err){statusNode.textContent="Erro: "+err.message}});
 bindDelete("mediaDeleteForm","media_id","/v1/admin/media/");
 bindDelete("userDeleteForm","username","/v1/admin/users/");
 bindDelete("categoryDeleteForm","category_id","/v1/admin/categories/");
