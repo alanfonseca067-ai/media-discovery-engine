@@ -9,7 +9,7 @@ from xml.etree.ElementTree import Element, SubElement, fromstring, tostring
 
 from fastapi import FastAPI, Header, HTTPException, Query, Request
 from fastapi.responses import HTMLResponse, PlainTextResponse, Response
-from pydantic import BaseModel, Field, HttpUrl, model_validator
+from pydantic import BaseModel, Field, HttpUrl, field_validator, model_validator
 
 from .config import ADMIN_KEY, PLAYBACK_SESSION_TTL_SECONDS
 from .database import connection, init_db
@@ -119,6 +119,19 @@ class SourceIn(BaseModel):
     catalog_media_type: str = Field(default="live", pattern="^(live|movie)$")
     enabled: bool = True
 
+    @field_validator("base_url", mode="before")
+    @classmethod
+    def validate_raw_base_url(cls, value):
+        if not isinstance(value, str):
+            return value
+        parsed = urlsplit(value)
+        decoded = unquote(parsed.path)
+        if parsed.username or parsed.password or parsed.query or parsed.fragment:
+            raise ValueError("URL base não pode conter credenciais, query ou fragmento")
+        if "\\" in decoded or "\x00" in decoded or any(part == ".." for part in decoded.split("/")):
+            raise ValueError("URL base contém caminho inválido")
+        return value
+
     @model_validator(mode="after")
     def validate_source_paths(self):
         parsed = urlsplit(str(self.base_url))
@@ -154,6 +167,19 @@ class SourceUpdate(BaseModel):
     manifest_path: str | None = Field(default=None, max_length=2048)
     catalog_media_type: str | None = Field(default=None, pattern="^(live|movie)$")
     enabled: bool | None = None
+
+    @field_validator("base_url", mode="before")
+    @classmethod
+    def validate_raw_update_base_url(cls, value):
+        if value is None or not isinstance(value, str):
+            return value
+        parsed = urlsplit(value)
+        decoded = unquote(parsed.path)
+        if parsed.username or parsed.password or parsed.query or parsed.fragment:
+            raise ValueError("URL base não pode conter credenciais, query ou fragmento")
+        if "\\" in decoded or "\x00" in decoded or any(part == ".." for part in decoded.split("/")):
+            raise ValueError("URL base contém caminho inválido")
+        return value
 
     @model_validator(mode="after")
     def validate_source_update(self):
