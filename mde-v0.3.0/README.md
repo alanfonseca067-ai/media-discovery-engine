@@ -152,13 +152,13 @@ A importação XMLTV não aceita DOCTYPE nem declarações de entidades e só gr
 | `GET /series/...` | Reprodução de episódio |
 | `GET /play-resource/...` | Segmentos e recursos HLS pelo proxy |
 | `GET /admin` | Painel administrativo |
-| `POST /v1/admin/sources` | Cadastro de fontes |
+| `POST /v1/admin/sources` | Cadastro de fontes |\n| `PATCH /v1/admin/sources/{id}` | Alterar fontes |\n| `DELETE /v1/admin/sources/{id}` | Remover fonte sem mídias vinculadas |
 | `POST /v1/admin/sources/{id}/collect` | Enfileirar coleta |
 | `POST /v1/admin/categories` | Cadastro de categorias |
-| `POST /v1/admin/media` | Cadastro de mídia |
-| `POST /v1/admin/users` | Cadastro de usuários |
+| `POST /v1/admin/media` | Cadastro de mídia |\n| `PATCH /v1/admin/media/{id}` | Alterar mídia |\n| `DELETE /v1/admin/media/{id}` | Remover mídia (séries também removem episódios vinculados) |
+| `POST /v1/admin/users` | Cadastro de usuários |\n| `PATCH /v1/admin/users/{username}` | Alterar usuário |\n| `DELETE /v1/admin/users/{username}` | Remover usuário |
 | `POST /v1/admin/epg/import` | Importar XMLTV |
-| `GET /v1/stats` | Estatísticas administrativas |
+| `GET /v1/admin/jobs` | Listagem de coletas |\n| `GET /v1/stats` | Estatísticas administrativas |
 
 ## Configurações
 
@@ -173,7 +173,7 @@ A importação XMLTV não aceita DOCTYPE nem declarações de entidades e só gr
 | `MDE_MAX_PLAYLIST_BYTES` | `2097152` | Tamanho máximo de playlist HLS |
 | `MDE_PLAYBACK_SESSION_TTL_SECONDS` | `120` | Validade do lease de sessão |
 | `MDE_COLLECTION_POLL_SECONDS` | `5` | Intervalo de consulta da fila |
-| `MDE_MAX_COLLECTION_BYTES` | `10485760` | Tamanho máximo do catálogo M3U |\n| `MDE_ALLOWED_PRIVATE_HOSTS` | vazio | Hosts privados explicitamente permitidos para laboratório; por exemplo `localhost,127.0.0.1` |
+| `MDE_MAX_COLLECTION_BYTES` | `10485760` | Tamanho máximo do catálogo M3U |\n| `MDE_ALLOWED_PRIVATE_HOSTS` | vazio | Hosts privados explicitamente permitidos para laboratório; por exemplo `127.0.0.1:8090,localhost:8090` |
 
 ## Testes
 
