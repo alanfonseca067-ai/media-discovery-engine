@@ -46,7 +46,7 @@ $lines = @(
     "MDE_MAX_PLAYLIST_BYTES=2097152",
     "MDE_ALLOWED_PRIVATE_HOSTS=$PrivateHosts"
 )
-Set-Content -Path $EnvFile -Value $lines -Encoding utf8
+Set-Content -Path $EnvFile -Value $lines -Encoding ascii
 
 Write-Host ""
 Write-Host "Configuração local salva em .env (arquivo ignorado pelo Git)." -ForegroundColor Green
