@@ -147,7 +147,7 @@ def create_media(payload: MediaIn, x_mde_admin_key: str | None = Header(default=
 
 
 @app.get("/player_api.php")
-def player_api(username: str, password: str, action: str | None = None):
+def player_api(request: Request, username: str, password: str, action: str | None = None, category_id: int | None = None, series_id: int | None = None, vod_id: int | None = None):
     user = authenticate(username, password)
     category_actions = {
         "get_live_categories": "live",
@@ -172,22 +172,63 @@ def player_api(username: str, password: str, action: str | None = None):
     if action in stream_actions:
         kind = stream_actions[action]
         with connection() as db:
-            rows = db.execute(
-                """SELECT id,title,category_id FROM media_items
-                   WHERE media_type=? AND enabled=1 ORDER BY sort_order,title""",
-                (kind,),
-            ).fetchall()
+            sql = """SELECT id,title,category_id FROM media_items
+                     WHERE media_type=? AND enabled=1"""
+            params = [kind]
+            if category_id is not None:
+                sql += " AND category_id=?"
+                params.append(category_id)
+            sql += " ORDER BY sort_order,title"
+            rows = db.execute(sql, params).fetchall()
         return [
             {
                 "num": index + 1,
                 "name": row["title"],
-                "stream_type": kind,
+                "title": row["title"],
+                "stream_type": "live" if kind == "live" else "movie",
                 "stream_id": row["id"],
                 "category_id": str(row["category_id"] or 0),
+                "category_ids": [row["category_id"]] if row["category_id"] else [],
                 "container_extension": "ts" if kind == "live" else "mp4",
+                "stream_icon": "",
+                "epg_channel_id": "",
+                "added": "0",
+                "is_adult": 0,
+                "custom_sid": "",
+                "direct_source": "",
+                "tv_archive": 0,
+                "tv_archive_duration": 0,
             }
             for index, row in enumerate(rows)
         ]
+    if action in {"get_vod_info", "get_series_info"}:
+        item_id = vod_id if action == "get_vod_info" else series_id
+        if item_id is None:
+            raise HTTPException(status_code=422, detail="Informe vod_id ou series_id")
+        with connection() as db:
+            item = db.execute(
+                """SELECT id,title,media_type,category_id FROM media_items
+                   WHERE id=? AND enabled=1""",
+                (item_id,),
+            ).fetchone()
+        expected_type = "movie" if action == "get_vod_info" else "series"
+        if not item or item["media_type"] != expected_type:
+            raise HTTPException(status_code=404, detail="Título não encontrado")
+        info = {
+            "name": item["title"], "title": item["title"],
+            "category_id": str(item["category_id"] or 0),
+            "cover": "", "plot": "", "cast": "", "director": "",
+            "genre": "", "releaseDate": "", "rating": "", "backdrop_path": [],
+        }
+        if action == "get_vod_info":
+            return {"info": info, "movie_data": {
+                "stream_id": item["id"], "name": item["title"],
+                "container_extension": "mp4",
+            }}
+        return {"seasons": [], "info": info, "episodes": {}}
+    scheme = request.url.scheme
+    host = request.url.hostname or "localhost"
+    port = request.url.port or (443 if scheme == "https" else 80)
     return {
         "user_info": {
             "username": username,
@@ -200,10 +241,10 @@ def player_api(username: str, password: str, action: str | None = None):
             "allowed_output_formats": ["ts", "m3u8"],
         },
         "server_info": {
-            "url": "127.0.0.1",
-            "port": "8000",
-            "https_port": "",
-            "server_protocol": "http",
+            "url": host,
+            "port": str(port),
+            "https_port": str(port) if scheme == "https" else "",
+            "server_protocol": scheme,
             "timezone": "UTC",
         },
     }
