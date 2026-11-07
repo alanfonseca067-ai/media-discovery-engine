@@ -183,5 +183,7 @@ def test_private_media_host_requires_explicit_allowlist(monkeypatch):
     with pytest.raises(HTTPException):
         delivery.validate_public_url("http://127.0.0.1:8090/live.m3u8")
 
-    monkeypatch.setattr(delivery, "ALLOWED_PRIVATE_HOSTS", frozenset({"127.0.0.1"}))
+    monkeypatch.setattr(delivery, "ALLOWED_PRIVATE_HOSTS", frozenset({"127.0.0.1:8090"}))
     assert delivery.validate_public_url("http://127.0.0.1:8090/live.m3u8") == "http://127.0.0.1:8090/live.m3u8"
+    with pytest.raises(HTTPException):
+        delivery.validate_public_url("http://127.0.0.1:8091/live.m3u8")
