@@ -101,7 +101,7 @@ O worker fica consultando a fila. Para processar uma única rodada e sair, use `
 
 ### Cadastrar uma fonte para coleta
 
-No painel ou no Swagger, use a chave no cabeçalho `X-MDE-Admin-Key`. Cadastre `base_url` como a raiz permitida e `manifest_path` como o caminho relativo do arquivo M3U. Selecione `catalog_media_type=live` ou `movie`. Depois chame `POST /v1/admin/sources/{source_id}/collect`. A resposta traz `job_id`; consulte `GET /v1/admin/jobs/{job_id}`.
+No painel ou no Swagger, use a chave no cabeçalho `X-MDE-Admin-Key`. Cadastre `base_url` como a raiz permitida e `manifest_path` como o caminho relativo do arquivo M3U. Selecione `catalog_media_type=live` ou `movie`. Antes, use `POST /v1/admin/sources/{source_id}/probe` para testar a playlist sem importar itens. Se os caminhos válidos estiverem corretos, chame `POST /v1/admin/sources/{source_id}/collect`. A resposta traz `job_id`; consulte `GET /v1/admin/jobs/{job_id}`.
 
 O worker importa nomes, grupos, TVG IDs e caminhos de mídia. Só aceita entradas da mesma origem (mesmo protocolo, host e porta) e dentro do caminho base cadastrado. Itens repetidos são ignorados. Entradas externas ou caminhos fora da fonte são descartados.
 
@@ -191,7 +191,7 @@ A importação XMLTV não aceita DOCTYPE nem declarações de entidades e só gr
 | `POST /v1/admin/sources` | Cadastro de fontes |
 | `PATCH /v1/admin/sources/{id}` | Alterar fontes |
 | `DELETE /v1/admin/sources/{id}` | Remover fonte sem mídias vinculadas |
-| `POST /v1/admin/sources/{id}/collect` | Enfileirar coleta |
+| `POST /v1/admin/sources/{id}/probe` | Testar manifesto e validar entradas antes da coleta |\n| `POST /v1/admin/sources/{id}/collect` | Enfileirar coleta |
 | `POST /v1/admin/categories` | Cadastro de categorias |
 | `PATCH /v1/admin/categories/{id}` | Renomear categoria |
 | `DELETE /v1/admin/categories/{id}` | Remover categoria sem mídias vinculadas |
