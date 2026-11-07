@@ -3,7 +3,7 @@ import hmac
 import html
 import time
 from datetime import datetime, timezone
-from urllib.parse import quote
+from urllib.parse import quote, unquote, urlsplit
 from xml.etree.ElementTree import Element, SubElement, fromstring, tostring
 
 from fastapi import FastAPI, Header, HTTPException, Query, Request
@@ -111,6 +111,24 @@ class SourceIn(BaseModel):
     catalog_media_type: str = Field(default="live", pattern="^(live|movie)$")
     enabled: bool = True
 
+    @model_validator(mode="after")
+    def validate_source_paths(self):
+        parsed = urlsplit(str(self.base_url))
+        if parsed.username is not None or parsed.password is not None:
+            raise ValueError("Credenciais devem ser configuradas fora da URL base")
+        manifest = urlsplit(self.manifest_path.strip())
+        decoded = unquote(manifest.path)
+        if (
+            manifest.scheme
+            or manifest.netloc
+            or self.manifest_path.strip().startswith("//")
+            or "\\" in decoded
+            or "\x00" in decoded
+            or any(part == ".." for part in decoded.split("/"))
+        ):
+            raise ValueError("manifest_path deve ser relativo e permanecer dentro da fonte")
+        return self
+
 
 class CategoryIn(BaseModel):
     name: str = Field(min_length=1, max_length=120)
@@ -156,6 +174,21 @@ class MediaIn(BaseModel):
     rating: str = Field(default="", max_length=16)
     epg_channel_id: str = Field(default="", max_length=256)
     tvg_id: str = Field(default="", max_length=256)
+
+    @model_validator(mode="after")
+    def validate_source_path(self):
+        parsed = urlsplit(self.source_path)
+        decoded = unquote(parsed.path)
+        if (
+            parsed.scheme
+            or parsed.netloc
+            or self.source_path.startswith("//")
+            or "\\" in decoded
+            or "\x00" in decoded
+            or any(part == ".." for part in decoded.split("/"))
+        ):
+            raise ValueError("source_path deve ser relativo e permanecer dentro da fonte cadastrada")
+        return self
 
 
 class EpgProgrammeIn(BaseModel):
