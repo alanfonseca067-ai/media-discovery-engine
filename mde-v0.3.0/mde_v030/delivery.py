@@ -9,7 +9,7 @@ import httpx
 from fastapi import HTTPException
 from fastapi.responses import RedirectResponse, Response, StreamingResponse
 
-from .config import MAX_PLAYLIST_BYTES, PROXY_TOKEN_TTL_SECONDS, UPSTREAM_TIMEOUT_SECONDS
+from .config import ALLOWED_PRIVATE_HOSTS, MAX_PLAYLIST_BYTES, PROXY_TOKEN_TTL_SECONDS, UPSTREAM_TIMEOUT_SECONDS
 from .database import connection
 
 _REDIRECT_CODES = {301, 302, 303, 307, 308}
@@ -45,14 +45,32 @@ def validate_public_url(value: str) -> str:
         if parsed.fragment:
             parsed = parsed._replace(fragment="")
         host = parsed.hostname.rstrip(".").lower()
-        if host in {"localhost", "localhost.localdomain"} or host.endswith(
-            (".localhost", ".local", ".internal", ".lan", ".home")
+        explicitly_allowed_private = host in ALLOWED_PRIVATE_HOSTS
+        if (
+            not explicitly_allowed_private
+            and (
+                host in {"localhost", "localhost.localdomain"}
+                or host.endswith((".localhost", ".local", ".internal", ".lan", ".home"))
+            )
         ):
-            raise ValueError("Host local não permitido")
+            raise ValueError("Host local não permitido; configure MDE_ALLOWED_PRIVATE_HOSTS apenas para testes controlados")
         port = parsed.port or (443 if scheme == "https" else 80)
         if not 1 <= port <= 65535:
             raise ValueError("Porta inválida")
-        _public_addresses(host, port)
+        try:
+            addresses = _public_addresses(host, port)
+        except ValueError:
+            if not explicitly_allowed_private:
+                raise
+            records = socket.getaddrinfo(host, port, type=socket.SOCK_STREAM)
+            addresses = {record[4][0].split("%", 1)[0] for record in records}
+            if not addresses:
+                raise ValueError("Host permitido sem endereço IP")
+            for address in addresses:
+                ip = ipaddress.ip_address(address)
+                if not (ip.is_private or ip.is_loopback or ip.is_link_local):
+                    raise ValueError("Allowlist privada não permite endereços reservados ou públicos")
+        return urlunsplit((scheme, parsed.netloc, parsed.path or "/", parsed.query, ""))
         return urlunsplit((scheme, parsed.netloc, parsed.path or "/", parsed.query, ""))
     except HTTPException:
         raise
