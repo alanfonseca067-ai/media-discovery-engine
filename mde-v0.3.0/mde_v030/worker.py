@@ -102,36 +102,51 @@ def fetch_catalog(source_base_url: str, manifest_path: str) -> tuple[str, str]:
     ) as client:
         current = manifest_url
         for _ in range(6):
-            response = client.get(current, headers={"Accept": "application/vnd.apple.mpegurl, audio/x-mpegurl, text/plain"})
-            if response.status_code in {301, 302, 303, 307, 308}:
-                location = response.headers.get("location")
-                if not location:
-                    raise ValueError("Redirecionamento de manifesto sem destino")
-                current = validate_public_url(urljoin(current, location))
-                if not _same_origin(source_base_url, current):
-                    raise ValueError("Redirecionamento saiu do host cadastrado")
-                continue
-            response.raise_for_status()
-            chunks = []
-            size = 0
-            for chunk in response.iter_bytes():
-                size += len(chunk)
-                if size > MAX_COLLECTION_BYTES:
-                    raise ValueError("Manifesto excede o tamanho máximo configurado")
-                chunks.append(chunk)
-            body = b"".join(chunks)
-            return body.decode("utf-8-sig"), current
+            with client.stream(
+                "GET",
+                current,
+                headers={"Accept": "application/vnd.apple.mpegurl, audio/x-mpegurl, text/plain"},
+            ) as response:
+                if response.status_code in {301, 302, 303, 307, 308}:
+                    location = response.headers.get("location")
+                    if not location:
+                        raise ValueError("Redirecionamento de manifesto sem destino")
+                    current = validate_public_url(urljoin(current, location))
+                    if not _same_origin(source_base_url, current):
+                        raise ValueError("Redirecionamento saiu do host cadastrado")
+                    continue
+                response.raise_for_status()
+                chunks = []
+                size = 0
+                for chunk in response.iter_bytes():
+                    size += len(chunk)
+                    if size > MAX_COLLECTION_BYTES:
+                        raise ValueError("Manifesto excede o tamanho máximo configurado")
+                    chunks.append(chunk)
+                body = b"".join(chunks)
+                return body.decode("utf-8-sig"), current
     raise ValueError("Limite de redirecionamentos do manifesto excedido")
 
 
 def process_job(job_id: int) -> dict:
     with connection() as db:
+        claimed = db.execute(
+            """UPDATE collection_jobs SET status='processing',error='',updated_at=CURRENT_TIMESTAMP
+               WHERE id=? AND status='queued'""",
+            (job_id,),
+        )
+        if claimed.rowcount == 0:
+            job_state = db.execute(
+                "SELECT status FROM collection_jobs WHERE id=?",
+                (job_id,),
+            ).fetchone()
+            if not job_state:
+                raise ValueError("Job de coleta não encontrado")
+            return {"status": job_state["status"], "claimed": False}
         job = db.execute(
             "SELECT id,source_id FROM collection_jobs WHERE id=?",
             (job_id,),
         ).fetchone()
-        if not job:
-            raise ValueError("Job de coleta não encontrado")
         source = db.execute(
             """SELECT id,base_url,manifest_path,catalog_media_type,enabled
                FROM sources WHERE id=?""",
@@ -149,10 +164,6 @@ def process_job(job_id: int) -> dict:
                 ("Cadastre manifest_path na fonte para iniciar a coleta", job_id),
             )
             return {"status": "failed", "error": "Manifesto não configurado"}
-        db.execute(
-            "UPDATE collection_jobs SET status='processing',error='',updated_at=CURRENT_TIMESTAMP WHERE id=?",
-            (job_id,),
-        )
         base_url = source["base_url"]
         manifest_path = source["manifest_path"]
         media_type = source["catalog_media_type"]
@@ -230,6 +241,10 @@ def run_worker(once: bool = False):
     init_db()
     while True:
         with connection() as db:
+            db.execute(
+                """UPDATE collection_jobs SET status='queued',updated_at=CURRENT_TIMESTAMP
+                   WHERE status='processing' AND updated_at < datetime('now','-15 minutes')"""
+            )
             job = db.execute(
                 "SELECT id FROM collection_jobs WHERE status='queued' ORDER BY id LIMIT 1"
             ).fetchone()
