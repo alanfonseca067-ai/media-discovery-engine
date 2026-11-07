@@ -153,6 +153,10 @@ class SourceUpdate(BaseModel):
 
     @model_validator(mode="after")
     def validate_source_update(self):
+        required_when_set = {"name", "base_url", "delivery_mode", "manifest_path", "catalog_media_type", "enabled"}
+        for field in required_when_set.intersection(self.model_fields_set):
+            if getattr(self, field) is None:
+                raise ValueError(f"{field} não pode ser null")
         if self.base_url is not None:
             parsed = urlsplit(str(self.base_url))
             decoded = unquote(parsed.path)
@@ -187,6 +191,10 @@ class MediaUpdate(BaseModel):
 
     @model_validator(mode="after")
     def validate_relative_source_path(self):
+        non_nullable = self.model_fields_set - {"category_id"}
+        for field in non_nullable:
+            if getattr(self, field) is None:
+                raise ValueError(f"{field} não pode ser null")
         if self.source_path is not None:
             parsed = urlsplit(self.source_path)
             decoded = unquote(parsed.path)
@@ -221,6 +229,13 @@ class UserUpdate(BaseModel):
     max_connections: int | None = Field(default=None, ge=0, le=100)
     expires_at: str | None = None
     enabled: bool | None = None
+
+    @model_validator(mode="after")
+    def validate_non_nullable_fields(self):
+        for field in {"password", "max_connections", "enabled"}.intersection(self.model_fields_set):
+            if getattr(self, field) is None:
+                raise ValueError(f"{field} não pode ser null")
+        return self
 
 
 class MediaIn(BaseModel):
