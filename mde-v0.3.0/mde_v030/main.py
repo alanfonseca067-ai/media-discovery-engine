@@ -239,6 +239,9 @@ class CategoryIn(BaseModel):
     name: str = Field(min_length=1, max_length=120)
     media_type: str = Field(pattern="^(live|movie|series)$")
 
+class CategoryUpdate(BaseModel):
+    name: str = Field(min_length=1, max_length=120)
+
 
 class UserIn(BaseModel):
     username: str = Field(min_length=3, max_length=64, pattern="^[A-Za-z0-9_.-]+$")
@@ -454,6 +457,53 @@ def list_categories(x_mde_admin_key: str | None = Header(default=None)):
     with connection() as db:
         rows = db.execute("SELECT id,name,media_type FROM categories ORDER BY media_type,name").fetchall()
     return [dict(row) for row in rows]
+
+
+@app.patch("/v1/admin/categories/{category_id}")
+def update_category(
+    category_id: int,
+    payload: CategoryUpdate,
+    x_mde_admin_key: str | None = Header(default=None),
+):
+    require_admin(x_mde_admin_key)
+    with connection() as db:
+        category = db.execute(
+            "SELECT id,media_type FROM categories WHERE id=?",
+            (category_id,),
+        ).fetchone()
+        if not category:
+            raise HTTPException(status_code=404, detail="Categoria não encontrada")
+        duplicate = db.execute(
+            "SELECT 1 FROM categories WHERE name=? AND media_type=? AND id<>?",
+            (payload.name.strip(), category["media_type"], category_id),
+        ).fetchone()
+        if duplicate:
+            raise HTTPException(status_code=409, detail="Já existe uma categoria com esse nome e tipo")
+        db.execute(
+            "UPDATE categories SET name=? WHERE id=?",
+            (payload.name.strip(), category_id),
+        )
+    return {"updated": True, "category_id": category_id}
+
+
+@app.delete("/v1/admin/categories/{category_id}")
+def delete_category(category_id: int, x_mde_admin_key: str | None = Header(default=None)):
+    require_admin(x_mde_admin_key)
+    with connection() as db:
+        category = db.execute(
+            "SELECT id FROM categories WHERE id=?",
+            (category_id,),
+        ).fetchone()
+        if not category:
+            raise HTTPException(status_code=404, detail="Categoria não encontrada")
+        used = db.execute(
+            "SELECT 1 FROM media_items WHERE category_id=? LIMIT 1",
+            (category_id,),
+        ).fetchone()
+        if used:
+            raise HTTPException(status_code=409, detail="A categoria possui mídias vinculadas")
+        db.execute("DELETE FROM categories WHERE id=?", (category_id,))
+    return {"deleted": True, "category_id": category_id}
 
 
 @app.post("/v1/admin/users")
