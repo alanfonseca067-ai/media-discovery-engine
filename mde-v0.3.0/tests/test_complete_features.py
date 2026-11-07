@@ -741,3 +741,90 @@ def test_source_probe_requires_manifest_configuration(client):
         headers=admin_headers(),
     )
     assert response.status_code == 422
+
+
+def test_media_playback_obeys_source_delivery_mode_and_registered_path(client, monkeypatch):
+    from fastapi.responses import JSONResponse
+
+    proxy_calls = []
+    redirect_calls = []
+
+    async def fake_proxy(url, media_id, request_base, username, password, headers, method="GET"):
+        proxy_calls.append((url, media_id, username, method))
+        return JSONResponse({"delivery": "proxy", "media_id": media_id})
+
+    async def fake_redirect(url):
+        redirect_calls.append(url)
+        return JSONResponse({"delivery": "redirect"})
+
+    monkeypatch.setattr(main, "resolve_source_url", lambda base, path: "https://safe.example/" + path)
+    monkeypatch.setattr(main, "deliver_proxy", fake_proxy)
+    monkeypatch.setattr(main, "deliver_redirect", fake_redirect)
+
+    proxy_source = create_source(client)
+    proxy_media = client.post(
+        "/v1/admin/media",
+        headers=admin_headers(),
+        json={
+            "title": "Proxy channel",
+            "media_type": "live",
+            "source_id": proxy_source,
+            "source_path": "live/proxy/master.m3u8",
+        },
+    )
+    assert proxy_media.status_code == 200
+    proxy_id = proxy_media.json()["id"]
+    proxy_response = client.get(f"/live/demo/change-this-password/{proxy_id}.ts")
+    assert proxy_response.status_code == 200
+    assert proxy_response.json()["delivery"] == "proxy"
+
+    redirect_source = client.post(
+        "/v1/admin/sources",
+        headers=admin_headers(),
+        json={
+            "name": "Redirect source",
+            "base_url": "https://redirect.example.test",
+            "delivery_mode": "redirect",
+        },
+    ).json()
+    redirect_media = client.post(
+        "/v1/admin/media",
+        headers=admin_headers(),
+        json={
+            "title": "Redirect movie",
+            "media_type": "movie",
+            "source_id": redirect_source["id"],
+            "source_path": "vod/redirect.mp4",
+        },
+    )
+    assert redirect_media.status_code == 200
+    redirect_id = redirect_media.json()["id"]
+    redirect_response = client.get(f"/movie/demo/change-this-password/{redirect_id}.mp4")
+    assert redirect_response.status_code == 200
+    assert redirect_response.json()["delivery"] == "redirect"
+
+    assert proxy_calls == [
+        ("https://safe.example/live/proxy/master.m3u8", proxy_id, "demo", "GET")
+    ]
+    assert redirect_calls == ["https://safe.example/vod/redirect.mp4"]
+
+
+def test_disabled_media_and_disabled_source_cannot_be_played(client):
+    source_id = create_source(client)
+    media = client.post(
+        "/v1/admin/media",
+        headers=admin_headers(),
+        json={
+            "title": "Disabled source media",
+            "media_type": "live",
+            "source_id": source_id,
+            "source_path": "live/disabled/master.m3u8",
+        },
+    ).json()
+    client.patch(
+        f"/v1/admin/sources/{source_id}",
+        headers=admin_headers(),
+        json={"enabled": False},
+    )
+    response = client.get(f"/live/demo/change-this-password/{media['id']}.ts")
+    assert response.status_code == 404
