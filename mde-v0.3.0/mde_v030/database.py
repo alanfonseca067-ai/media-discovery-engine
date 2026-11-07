@@ -15,13 +15,21 @@ CREATE TABLE IF NOT EXISTS categories (
  name TEXT NOT NULL,
  media_type TEXT NOT NULL CHECK(media_type IN ('live','movie','series'))
 );
+CREATE TABLE IF NOT EXISTS sources (
+ id INTEGER PRIMARY KEY AUTOINCREMENT,
+ name TEXT NOT NULL,
+ base_url TEXT NOT NULL,
+ delivery_mode TEXT NOT NULL DEFAULT 'redirect' CHECK(delivery_mode IN ('redirect','proxy')),
+ enabled INTEGER NOT NULL DEFAULT 1,
+ created_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP
+);
 CREATE TABLE IF NOT EXISTS media_items (
  id INTEGER PRIMARY KEY AUTOINCREMENT,
  title TEXT NOT NULL,
  media_type TEXT NOT NULL CHECK(media_type IN ('live','movie','series','episode')),
  category_id INTEGER REFERENCES categories(id),
- source_url TEXT NOT NULL,
- delivery_mode TEXT NOT NULL DEFAULT 'redirect' CHECK(delivery_mode IN ('redirect','proxy')),
+ source_id INTEGER REFERENCES sources(id),
+ source_path TEXT NOT NULL DEFAULT '',
  enabled INTEGER NOT NULL DEFAULT 1,
  sort_order INTEGER NOT NULL DEFAULT 0
 );
@@ -32,6 +40,7 @@ def connection():
     DATABASE_PATH.parent.mkdir(parents=True, exist_ok=True)
     db = sqlite3.connect(DATABASE_PATH)
     db.row_factory = sqlite3.Row
+    db.execute("PRAGMA foreign_keys = ON")
     try:
         yield db
         db.commit()
