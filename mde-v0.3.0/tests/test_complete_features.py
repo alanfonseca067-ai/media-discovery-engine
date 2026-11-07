@@ -693,3 +693,51 @@ def test_duplicate_episode_numbers_are_rejected(client):
         json={**episode_payload, "title": "Duplicate episode"},
     )
     assert second.status_code == 409
+
+
+def test_source_probe_checks_manifest_and_rejects_external_entries(client, monkeypatch):
+    source_id = create_source(client)
+    manifest = """#EXTM3U
+#EXTINF:-1 tvg-id="test.channel" group-title="Test",Test channel
+live/test/master.m3u8
+#EXTINF:-1 group-title="External",External entry
+https://outside.example.test/live/outside.m3u8
+"""
+    monkeypatch.setattr(
+        main.worker,
+        "fetch_catalog",
+        lambda base_url, manifest_path: (
+            manifest,
+            "https://media.example.test/catalog/channels.m3u",
+        ),
+    )
+    monkeypatch.setattr(main.worker, "validate_public_url", lambda value: value)
+    response = client.post(
+        f"/v1/admin/sources/{source_id}/probe",
+        headers=admin_headers(),
+    )
+    assert response.status_code == 200, response.text
+    result = response.json()
+    assert result["manifest_reachable"] is True
+    assert result["total_entries"] == 2
+    assert result["valid_entries"] == 1
+    assert result["rejected_entries"] == 1
+    assert result["preview"][0]["source_path"] == "live/test/master.m3u8"
+
+
+def test_source_probe_requires_manifest_configuration(client):
+    source = client.post(
+        "/v1/admin/sources",
+        headers=admin_headers(),
+        json={
+            "name": "Manual source",
+            "base_url": "https://manual.example.test",
+            "delivery_mode": "proxy",
+        },
+    )
+    assert source.status_code == 200
+    response = client.post(
+        f"/v1/admin/sources/{source.json()['id']}/probe",
+        headers=admin_headers(),
+    )
+    assert response.status_code == 422
