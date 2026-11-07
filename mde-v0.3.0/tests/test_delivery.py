@@ -177,3 +177,11 @@ def test_proxy_hls_response_rewrites_segments_and_key_urls(tmp_path, monkeypatch
     assert response.media_type == "application/vnd.apple.mpegurl"
     assert "upstream.example" not in response.body.decode()
     assert response.body.decode().count("/play-resource/demo/secret/99/") == 2
+
+
+def test_private_media_host_requires_explicit_allowlist(monkeypatch):
+    with pytest.raises(HTTPException):
+        delivery.validate_public_url("http://127.0.0.1:8090/live.m3u8")
+
+    monkeypatch.setattr(delivery, "ALLOWED_PRIVATE_HOSTS", frozenset({"127.0.0.1"}))
+    assert delivery.validate_public_url("http://127.0.0.1:8090/live.m3u8") == "http://127.0.0.1:8090/live.m3u8"
