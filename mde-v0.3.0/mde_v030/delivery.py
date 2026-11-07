@@ -79,7 +79,6 @@ def validate_public_url(value: str) -> str:
                 ):
                     raise ValueError("Allowlist privada não permite endereços reservados ou públicos")
         return urlunsplit((scheme, parsed.netloc, parsed.path or "/", parsed.query, ""))
-        return urlunsplit((scheme, parsed.netloc, parsed.path or "/", parsed.query, ""))
     except HTTPException:
         raise
     except Exception as exc:
