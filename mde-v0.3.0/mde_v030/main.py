@@ -20,6 +20,7 @@ from .delivery import (
     resolve_source_url,
 )
 from .security import hash_password, verify_password
+from . import worker
 
 @asynccontextmanager
 async def lifespan(application: FastAPI):
@@ -752,6 +753,55 @@ def create_media(payload: MediaIn, x_mde_admin_key: str | None = Header(default=
             "source_id": payload.source_id,
             "series_id": parent_id,
         }
+
+
+@app.post("/v1/admin/sources/{source_id}/probe")
+def probe_source(source_id: int, x_mde_admin_key: str | None = Header(default=None)):
+    require_admin(x_mde_admin_key)
+    with connection() as db:
+        source = db.execute(
+            """SELECT id,name,base_url,manifest_path,catalog_media_type,enabled
+               FROM sources WHERE id=?""",
+            (source_id,),
+        ).fetchone()
+    if not source or not source["enabled"]:
+        raise HTTPException(status_code=404, detail="Fonte inexistente ou desativada")
+    if not source["manifest_path"]:
+        raise HTTPException(status_code=422, detail="Cadastre manifest_path para testar a playlist")
+    try:
+        content, manifest_url = worker.fetch_catalog(source["base_url"], source["manifest_path"])
+        entries = worker.parse_m3u(content)
+    except Exception as exc:
+        raise HTTPException(status_code=502, detail=f"Falha ao consultar a playlist da fonte: {str(exc)[:500]}") from exc
+    valid = []
+    rejected = 0
+    for entry in entries:
+        try:
+            relative_path = worker.resolve_catalog_entry(
+                source["base_url"],
+                entry.uri,
+                manifest_url,
+            )
+            valid.append({
+                "title": entry.title,
+                "group": entry.group,
+                "tvg_id": entry.tvg_id,
+                "source_path": relative_path,
+            })
+        except Exception:
+            rejected += 1
+    return {
+        "source_id": source_id,
+        "source_name": source["name"],
+        "manifest_reachable": True,
+        "manifest_url": manifest_url,
+        "catalog_media_type": source["catalog_media_type"],
+        "total_entries": len(entries),
+        "valid_entries": len(valid),
+        "rejected_entries": rejected,
+        "preview": valid[:20],
+        "note": "O teste valida a playlist e os caminhos permitidos; não inicia reprodução dos segmentos.",
+    }
 
 
 @app.post("/v1/admin/sources/{source_id}/collect")
