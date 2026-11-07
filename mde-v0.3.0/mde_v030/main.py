@@ -1392,15 +1392,15 @@ def xmltv(request: Request, username: str, password: str):
 ADMIN_PANEL = """<!doctype html>
 <html lang="pt-br"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
 <title>MDE Admin</title><style>
-body{font:15px system-ui;background:#111827;color:#e5e7eb;margin:0;padding:24px}main{max-width:1000px;margin:auto}
-section{background:#1f2937;padding:18px;border-radius:12px;margin:14px 0}input,select,button{padding:10px;margin:4px;border-radius:6px;border:1px solid #4b5563;background:#111827;color:#f9fafb}
-button{background:#2563eb;cursor:pointer}pre{white-space:pre-wrap;overflow-wrap:anywhere;background:#0b1220;padding:12px;border-radius:8px}
+body{font:15px system-ui;background:#111827;color:#e5e7eb;margin:0;padding:24px}main{max-width:1100px;margin:auto}
+section{background:#1f2937;padding:18px;border-radius:12px;margin:14px 0}input,select,textarea,button{padding:10px;margin:4px;border-radius:6px;border:1px solid #4b5563;background:#111827;color:#f9fafb;box-sizing:border-box}
+button{background:#2563eb;cursor:pointer}button.danger{background:#991b1b}pre{white-space:pre-wrap;overflow-wrap:anywhere;background:#0b1220;padding:12px;border-radius:8px;max-height:520px;overflow:auto}
 .grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(260px,1fr));gap:12px}.grid form{display:flex;flex-direction:column;align-items:stretch}
-small{color:#9ca3af}
+small{color:#9ca3af}.status{margin-left:10px;color:#93c5fd}.muted{color:#9ca3af}
 </style></head><body><main><h1>Media Discovery Engine</h1>
 <p>Administração local — cadastre apenas fontes e conteúdos autorizados.</p>
 <section><label>Chave administrativa <input id="key" type="password" autocomplete="off"></label>
-<button onclick="refreshAll()">Atualizar painel</button><span id="status"></span></section>
+<button onclick="refreshAll()">Atualizar painel</button><span id="status" class="status"></span></section>
 <div class="grid">
 <section><h2>Fonte</h2><form id="sourceForm">
 <input name="name" placeholder="Nome da fonte" required>
@@ -1417,7 +1417,7 @@ small{color:#9ca3af}
 <input name="username" placeholder="Usuário" minlength="3" required>
 <input name="password" type="password" placeholder="Senha (mínimo 10 caracteres)" minlength="10" required>
 <input name="max_connections" type="number" min="0" max="100" value="1">
-<input name="expires_at" placeholder="Expiração ISO (opcional)">
+<input name="expires_at" placeholder="Expiração ISO com fuso (opcional)">
 <button>Cadastrar usuário</button></form></section>
 <section><h2>Mídia</h2><form id="mediaForm">
 <input name="title" placeholder="Título" required>
@@ -1432,23 +1432,80 @@ small{color:#9ca3af}
 <input name="tvg_id" placeholder="TVG ID">
 <button>Cadastrar mídia</button></form></section>
 </div>
+<div class="grid">
+<section><h2>Editar fonte</h2><form id="sourceUpdateForm">
+<input name="source_id" type="number" placeholder="ID da fonte" required>
+<input name="name" placeholder="Novo nome (opcional)">
+<input name="base_url" placeholder="Nova URL base (opcional)">
+<input name="manifest_path" placeholder="Novo manifesto (opcional)">
+<select name="delivery_mode"><option value="">Manter modo atual</option><option value="proxy">Proxy</option><option value="redirect">Redirect</option></select>
+<select name="enabled"><option value="">Manter estado</option><option value="true">Ativa</option><option value="false">Desativada</option></select>
+<button>Atualizar fonte</button></form>
+<form id="sourceDeleteForm"><input name="source_id" type="number" placeholder="ID da fonte para excluir" required><button class="danger">Excluir fonte sem mídias</button></form></section>
+<section><h2>Editar mídia</h2><form id="mediaUpdateForm">
+<input name="media_id" type="number" placeholder="ID da mídia" required>
+<input name="title" placeholder="Novo título (opcional)">
+<input name="source_id" type="number" placeholder="Novo ID da fonte (opcional)">
+<input name="source_path" placeholder="Novo caminho (opcional)">
+<input name="sort_order" type="number" placeholder="Ordem (opcional)">
+<select name="enabled"><option value="">Manter estado</option><option value="true">Ativa</option><option value="false">Desativada</option></select>
+<button>Atualizar mídia</button></form>
+<form id="mediaDeleteForm"><input name="media_id" type="number" placeholder="ID da mídia para excluir" required><button class="danger">Excluir mídia</button></form></section>
+<section><h2>Editar usuário</h2><form id="userUpdateForm">
+<input name="username" placeholder="Usuário" required>
+<input name="password" type="password" placeholder="Nova senha (opcional)" minlength="10">
+<input name="max_connections" type="number" min="0" max="100" placeholder="Limite (opcional)">
+<input name="expires_at" placeholder="Nova expiração ISO ou deixe vazio">
+<select name="enabled"><option value="">Manter estado</option><option value="true">Ativo</option><option value="false">Desativado</option></select>
+<button>Atualizar usuário</button></form>
+<form id="userDeleteForm"><input name="username" placeholder="Usuário para excluir" required><button class="danger">Excluir usuário</button></form></section>
+<section><h2>Editar categoria</h2><form id="categoryUpdateForm">
+<input name="category_id" type="number" placeholder="ID da categoria" required>
+<input name="name" placeholder="Novo nome" required>
+<button>Renomear categoria</button></form>
+<form id="categoryDeleteForm"><input name="category_id" type="number" placeholder="ID da categoria para excluir" required><button class="danger">Excluir categoria sem mídias</button></form></section>
+</div>
 <section><h2>Coleta de catálogo</h2><form id="collectForm">
 <input name="source_id" type="number" placeholder="ID da fonte" required>
-<button>Enfileirar coleta</button></form><small>Execute o processo worker em outro terminal para processar a fila.</small></section>
+<button>Enfileirar coleta</button></form>
+<form id="retryJobForm"><input name="job_id" type="number" placeholder="ID de job concluído/com falha" required><button>Reenfileirar job</button></form>
+<small>Execute o processo worker em outro terminal para processar a fila.</small></section>
+<div class="grid">
 <section><h2>Importar guia XMLTV</h2><form id="epgImportForm">
 <textarea id="epgXml" rows="6" placeholder="Cole o conteúdo XMLTV autorizado aqui" required></textarea>
 <button>Importar XMLTV</button></form><small>Somente canais com EPG ID já cadastrado serão importados.</small></section>
+<section><h2>Adicionar programa EPG</h2><form id="epgProgrammeForm">
+<input name="channel_id" placeholder="ID EPG do canal" required>
+<input name="title" placeholder="Título do programa" required>
+<input name="start_at" placeholder="Início ISO com fuso, ex. 2026-11-07T19:00:00-04:00" required>
+<input name="end_at" placeholder="Fim ISO com fuso" required>
+<input name="description" placeholder="Descrição">
+<input name="category" placeholder="Categoria">
+<button>Salvar programação</button></form></section>
+</div>
 <section><h2>Visão geral</h2><pre id="output">Clique em Atualizar painel.</pre></section>
 </main><script>
 const keyInput=document.getElementById("key"),statusNode=document.getElementById("status"),output=document.getElementById("output");
 function auth(){return {"X-MDE-Admin-Key":keyInput.value,"Content-Type":"application/json"}}
 async function api(path,method="GET",body=null){const r=await fetch(path,{method,headers:auth(),body:body?JSON.stringify(body):null});const t=await r.text();let data;try{data=JSON.parse(t)}catch{data=t}if(!r.ok)throw new Error(typeof data==="string"?data:JSON.stringify(data));return data}
-function formData(form){const obj=Object.fromEntries(new FormData(form).entries());for(const k of Object.keys(obj)){if(obj[k]==="")delete obj[k]}for(const k of ["source_id","category_id","series_id","season_number","episode_number","max_connections"]){if(obj[k]!==undefined)obj[k]=Number(obj[k])}return obj}
+function formData(form){const obj=Object.fromEntries(new FormData(form).entries());for(const k of Object.keys(obj)){if(obj[k]==="")delete obj[k]}for(const k of ["source_id","media_id","category_id","series_id","season_number","episode_number","max_connections","sort_order","job_id"]){if(obj[k]!==undefined)obj[k]=Number(obj[k])}if(obj.enabled!==undefined)obj.enabled=obj.enabled==="true";return obj}
 function bind(id,path,method="POST"){document.getElementById(id).addEventListener("submit",async e=>{e.preventDefault();try{const result=await api(path,method,formData(e.target));statusNode.textContent="Salvo: "+JSON.stringify(result);e.target.reset();}catch(err){statusNode.textContent="Erro: "+err.message}})}
+function bindPatch(id,idField,pathPrefix){document.getElementById(id).addEventListener("submit",async e=>{e.preventDefault();try{const d=formData(e.target),itemId=d[idField];delete d[idField];const result=await api(pathPrefix+encodeURIComponent(itemId),"PATCH",d);statusNode.textContent="Atualizado: "+JSON.stringify(result);e.target.reset()}catch(err){statusNode.textContent="Erro: "+err.message}})}
+function bindDelete(id,idField,pathPrefix){document.getElementById(id).addEventListener("submit",async e=>{e.preventDefault();try{const d=formData(e.target),itemId=d[idField];if(!confirm("Confirma a exclusão de "+itemId+"?"))return;const result=await api(pathPrefix+encodeURIComponent(itemId),"DELETE");statusNode.textContent="Excluído: "+JSON.stringify(result);e.target.reset()}catch(err){statusNode.textContent="Erro: "+err.message}})}
 bind("sourceForm","/v1/admin/sources");bind("categoryForm","/v1/admin/categories");bind("userForm","/v1/admin/users");bind("mediaForm","/v1/admin/media");
-document.getElementById("collectForm").addEventListener("submit",async e=>{e.preventDefault();try{const d=formData(e.target);const r=await api("/v1/admin/sources/"+d.source_id+"/collect","POST",{});statusNode.textContent="Coleta: "+JSON.stringify(r)}catch(err){statusNode.textContent="Erro: "+err.message}});
+bindPatch("sourceUpdateForm","source_id","/v1/admin/sources/");
+bindPatch("mediaUpdateForm","media_id","/v1/admin/media/");
+bindPatch("userUpdateForm","username","/v1/admin/users/");
+bindPatch("categoryUpdateForm","category_id","/v1/admin/categories/");
+bindDelete("sourceDeleteForm","source_id","/v1/admin/sources/");
+bindDelete("mediaDeleteForm","media_id","/v1/admin/media/");
+bindDelete("userDeleteForm","username","/v1/admin/users/");
+bindDelete("categoryDeleteForm","category_id","/v1/admin/categories/");
+document.getElementById("collectForm").addEventListener("submit",async e=>{e.preventDefault();try{const d=formData(e.target);const r=await api("/v1/admin/sources/"+d.source_id+"/collect","POST",{});statusNode.textContent="Coleta: "+JSON.stringify(r);e.target.reset()}catch(err){statusNode.textContent="Erro: "+err.message}});
+document.getElementById("retryJobForm").addEventListener("submit",async e=>{e.preventDefault();try{const d=formData(e.target);const r=await api("/v1/admin/jobs/"+d.job_id+"/retry","POST",{});statusNode.textContent="Job: "+JSON.stringify(r);e.target.reset()}catch(err){statusNode.textContent="Erro: "+err.message}});
 document.getElementById("epgImportForm").addEventListener("submit",async e=>{e.preventDefault();try{const xml=document.getElementById("epgXml").value;const r=await api("/v1/admin/epg/import","POST",{xml_content:xml});statusNode.textContent="EPG: "+JSON.stringify(r)}catch(err){statusNode.textContent="Erro: "+err.message}});
-async function refreshAll(){try{const results={stats:await api("/v1/stats"),sources:await api("/v1/admin/sources"),categories:await api("/v1/admin/categories"),users:await api("/v1/admin/users"),media:await api("/v1/admin/media"),epg:await api("/v1/admin/epg/programmes")};output.textContent=JSON.stringify(results,null,2);statusNode.textContent="Painel atualizado"}catch(err){statusNode.textContent="Erro: "+err.message}}
+bind("epgProgrammeForm","/v1/admin/epg/programmes");
+async function refreshAll(){try{const results={stats:await api("/v1/stats"),sources:await api("/v1/admin/sources"),categories:await api("/v1/admin/categories"),users:await api("/v1/admin/users"),media:await api("/v1/admin/media"),jobs:await api("/v1/admin/jobs"),epg:await api("/v1/admin/epg/programmes")};output.textContent=JSON.stringify(results,null,2);statusNode.textContent="Painel atualizado"}catch(err){statusNode.textContent="Erro: "+err.message}}
 </script></body></html>"""
 
 
