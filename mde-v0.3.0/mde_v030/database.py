@@ -57,7 +57,6 @@ CREATE TABLE IF NOT EXISTS proxy_resources (
 );
 CREATE INDEX IF NOT EXISTS idx_proxy_resources_expiry ON proxy_resources(expires_at);
 CREATE INDEX IF NOT EXISTS idx_media_type_category ON media_items(media_type, category_id, enabled);
-CREATE INDEX IF NOT EXISTS idx_media_parent_season ON media_items(parent_id, season_number, episode_number);
 CREATE TABLE IF NOT EXISTS playback_sessions (
  username TEXT NOT NULL,
  client_key TEXT NOT NULL,
@@ -97,6 +96,7 @@ _MIGRATIONS = {
     },
     "sources": {
         "manifest_path": "TEXT NOT NULL DEFAULT ''",
+        "catalog_media_type": "TEXT NOT NULL DEFAULT 'live'",
     },
     "media_items": {
         "parent_id": "INTEGER REFERENCES media_items(id) ON DELETE CASCADE",
@@ -143,6 +143,7 @@ def init_db():
             for name, definition in columns.items():
                 if name not in existing:
                     db.execute(f"ALTER TABLE {table} ADD COLUMN {name} {definition}")
+        db.execute("CREATE INDEX IF NOT EXISTS idx_media_parent_season ON media_items(parent_id, season_number, episode_number)")
         count = db.execute("SELECT COUNT(*) FROM users").fetchone()[0]
         if count == 0:
             from .security import hash_password
