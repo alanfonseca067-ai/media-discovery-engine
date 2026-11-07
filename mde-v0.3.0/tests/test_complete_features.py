@@ -84,7 +84,7 @@ def test_series_seasons_and_episode_routes(client):
         },
     )
     assert listed.status_code == 200
-    assert listed.json()[0]["stream_id"] == series_id
+    assert listed.json()[0]["series_id"] == series_id
 
     details = client.get(
         "/player_api.php",
@@ -404,3 +404,147 @@ def test_admin_rejects_source_base_with_query_or_credentials(client):
             },
         )
         assert response.status_code == 422, response.text
+
+
+def test_admin_can_update_and_delete_sources_media_and_users(client):
+    source_id = create_source(client)
+    category = client.post(
+        "/v1/admin/categories",
+        headers=admin_headers(),
+        json={"name": "CRUD channels", "media_type": "live"},
+    ).json()
+    media = client.post(
+        "/v1/admin/media",
+        headers=admin_headers(),
+        json={
+            "title": "CRUD test",
+            "media_type": "live",
+            "source_id": source_id,
+            "source_path": "live/crud/master.m3u8",
+            "category_id": category["id"],
+        },
+    )
+    assert media.status_code == 200
+    media_id = media.json()["id"]
+
+    changed_source = client.patch(
+        f"/v1/admin/sources/{source_id}",
+        headers=admin_headers(),
+        json={"delivery_mode": "redirect", "enabled": False},
+    )
+    assert changed_source.status_code == 200
+    listed_sources = client.get("/v1/admin/sources", headers=admin_headers())
+    assert listed_sources.json()[0]["enabled"] == 0
+
+    changed_media = client.patch(
+        f"/v1/admin/media/{media_id}",
+        headers=admin_headers(),
+        json={"title": "Renamed test", "enabled": False},
+    )
+    assert changed_media.status_code == 200
+    listed_media = client.get("/v1/admin/media", headers=admin_headers())
+    assert next(item for item in listed_media.json() if item["id"] == media_id)["title"] == "Renamed test"
+
+    blocked_delete = client.delete(
+        f"/v1/admin/sources/{source_id}",
+        headers=admin_headers(),
+    )
+    assert blocked_delete.status_code == 409
+
+    deleted_media = client.delete(
+        f"/v1/admin/media/{media_id}",
+        headers=admin_headers(),
+    )
+    assert deleted_media.status_code == 200
+    deleted_source = client.delete(
+        f"/v1/admin/sources/{source_id}",
+        headers=admin_headers(),
+    )
+    assert deleted_source.status_code == 200
+
+    user = client.post(
+        "/v1/admin/users",
+        headers=admin_headers(),
+        json={"username": "delete-me", "password": "secure-test-password"},
+    )
+    assert user.status_code == 200
+    deleted_user = client.delete("/v1/admin/users/delete-me", headers=admin_headers())
+    assert deleted_user.status_code == 200
+
+
+def test_admin_update_rejects_null_required_fields(client):
+    source_id = create_source(client)
+    response = client.patch(
+        f"/v1/admin/sources/{source_id}",
+        headers=admin_headers(),
+        json={"base_url": None},
+    )
+    assert response.status_code == 422
+
+    user = client.post(
+        "/v1/admin/users",
+        headers=admin_headers(),
+        json={"username": "nullable-user", "password": "secure-test-password"},
+    )
+    assert user.status_code == 200
+    invalid_user_patch = client.patch(
+        "/v1/admin/users/nullable-user",
+        headers=admin_headers(),
+        json={"password": None},
+    )
+    assert invalid_user_patch.status_code == 422
+
+
+def test_series_xtream_list_uses_series_id_not_stream_id(client):
+    source_id = create_source(client)
+    category = client.post(
+        "/v1/admin/categories",
+        headers=admin_headers(),
+        json={"name": "Series shape", "media_type": "series"},
+    ).json()
+    series = client.post(
+        "/v1/admin/media",
+        headers=admin_headers(),
+        json={
+            "title": "Xtream Series",
+            "media_type": "series",
+            "source_id": source_id,
+            "source_path": "series/metadata",
+            "category_id": category["id"],
+        },
+    ).json()
+    response = client.get(
+        "/player_api.php",
+        params={
+            "username": "demo",
+            "password": "change-this-password",
+            "action": "get_series",
+        },
+    )
+    assert response.status_code == 200
+    assert response.json()[0]["series_id"] == series["id"]
+    assert "stream_id" not in response.json()[0]
+
+
+def test_m3u_basic_type_still_has_extinf_lines(client):
+    source_id = create_source(client)
+    client.post(
+        "/v1/admin/media",
+        headers=admin_headers(),
+        json={
+            "title": "M3U basic",
+            "media_type": "live",
+            "source_id": source_id,
+            "source_path": "live/basic/master.m3u8",
+        },
+    )
+    response = client.get(
+        "/get.php",
+        params={
+            "username": "demo",
+            "password": "change-this-password",
+            "type": "m3u",
+        },
+    )
+    assert response.status_code == 200
+    assert "#EXTINF:-1,M3U basic" in response.text
