@@ -297,3 +297,45 @@ def test_database_migration_adds_columns_to_old_schema(tmp_path, monkeypatch):
     assert "max_connections" in user_cols
     assert "catalog_media_type" in source_cols
     assert "season_number" in media_cols
+
+
+def test_xmltv_import_accepts_registered_channels_only(client):
+    source_id = create_source(client)
+    client.post(
+        "/v1/admin/media",
+        headers=admin_headers(),
+        json={
+            "title": "Import EPG channel",
+            "media_type": "live",
+            "source_id": source_id,
+            "source_path": "live/import/master.m3u8",
+            "epg_channel_id": "known.channel",
+        },
+    )
+    start = (datetime.now(timezone.utc) + timedelta(minutes=10)).strftime("%Y%m%d%H%M%S +0000")
+    stop = (datetime.now(timezone.utc) + timedelta(minutes=70)).strftime("%Y%m%d%H%M%S +0000")
+    xml = f'''<?xml version="1.0" encoding="UTF-8"?>
+    <tv>
+      <channel id="known.channel"><display-name>Known</display-name></channel>
+      <programme channel="known.channel" start="{start}" stop="{stop}">
+        <title>Imported show</title><desc>Imported description</desc><category>News</category>
+      </programme>
+      <programme channel="not.registered" start="{start}" stop="{stop}">
+        <title>Must be ignored</title>
+      </programme>
+    </tv>'''
+    response = client.post(
+        "/v1/admin/epg/import",
+        headers=admin_headers(),
+        json={"xml_content": xml},
+    )
+    assert response.status_code == 200, response.text
+    assert response.json()["imported_programmes"] == 1
+    assert response.json()["ignored_programmes"] == 1
+
+
+def test_admin_panel_is_available(client):
+    response = client.get("/admin")
+    assert response.status_code == 200
+    assert "Media Discovery Engine" in response.text
+    assert "X-MDE-Admin-Key" in response.text
