@@ -386,3 +386,21 @@ def test_worker_rejects_encoded_parent_directory_escape(monkeypatch):
             "%2e%2e/private/secret.m3u8",
             "https://media.example.test/catalog/list.m3u",
         )
+
+
+def test_admin_rejects_source_base_with_query_or_credentials(client):
+    for base_url in [
+        "https://user:password@media.example.test",
+        "https://media.example.test/catalog?token=secret",
+        "https://media.example.test/catalog/%2e%2e/private",
+    ]:
+        response = client.post(
+            "/v1/admin/sources",
+            headers=admin_headers(),
+            json={
+                "name": "Invalid base",
+                "base_url": base_url,
+                "delivery_mode": "proxy",
+            },
+        )
+        assert response.status_code == 422, response.text
