@@ -3,7 +3,7 @@ import posixpath
 import re
 import time
 from dataclasses import dataclass
-from urllib.parse import urljoin, urlsplit, urlunsplit
+from urllib.parse import unquote, urljoin, urlsplit, urlunsplit
 
 import httpx
 
@@ -76,8 +76,16 @@ def resolve_catalog_entry(base_url: str, uri: str, reference_url: str | None = N
         raise ValueError("A entrada aponta para outro host ou porta; importação recusada")
     base = urlsplit(base_url)
     target = urlsplit(safe)
-    base_path = posixpath.normpath(base.path or "/")
-    target_path = posixpath.normpath(target.path or "/")
+    decoded_base_path = unquote(base.path or "/")
+    decoded_target_path = unquote(target.path or "/")
+    if (
+        "\\" in decoded_target_path
+        or "\x00" in decoded_target_path
+        or any(part == ".." for part in decoded_target_path.split("/"))
+    ):
+        raise ValueError("A entrada contém caminho relativo fora do catálogo")
+    base_path = posixpath.normpath(decoded_base_path)
+    target_path = posixpath.normpath(decoded_target_path)
     prefix = base_path.rstrip("/")
     if prefix and prefix != "/" and not (target_path == prefix or target_path.startswith(prefix + "/")):
         raise ValueError("A entrada está fora do caminho cadastrado para a fonte")
